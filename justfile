@@ -27,6 +27,9 @@ test:
 coverage:
   npx vitest run --coverage
 
+release bump: check
+  npx tsx tools/release.ts {{bump}}
+
 _git_status:
   git status
 
