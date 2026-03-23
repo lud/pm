@@ -21,7 +21,7 @@ schema:
 test:
   npm run test
 
-coverage:
+test-coverage:
   npx vitest run --coverage
 
 release bump: check
@@ -30,4 +30,4 @@ release bump: check
 _git_status:
   git status
 
-check: test coverage schema typecheck format _git_status
+check: format test-coverage build schema typecheck _git_status

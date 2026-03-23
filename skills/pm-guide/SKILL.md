@@ -4,6 +4,7 @@ description:
   Guide for using the `pm` project management CLI. Auto-load this when you
   detect a `.pm.json` file in the project or when the user mentions features,
   specs, tasks, or project management documents.
+user-invocable: true
 ---
 
 # PM — Project Management CLI Guide
@@ -91,9 +92,16 @@ command to get/set the current document.
 
 Run any command with `--help` for full usage details.
 
+### Initialization
+
+```bash
+pm init                    # Create .pm.json in current directory
+```
+
 ### Querying
 
 ```bash
+pm info                    # Show project config: doctypes, hierarchy, done statuses
 pm status                  # Counts per doctype + current document details
 pm list                    # List all active documents
 pm list -t task            # List active tasks only
@@ -126,12 +134,6 @@ pm edit 003 status:blocked reason:"waiting on API"  # Set multiple properties
 pm edit 003 -p 002                           # Set/change parent
 pm done 003                                  # Mark as done (first done status)
 pm current 003                               # Set document 003 as current
-```
-
-### Maintenance
-
-```bash
-pm init                    # Create .pm.json in current directory
 ```
 
 ## Typical workflow

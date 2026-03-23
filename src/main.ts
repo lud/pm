@@ -10,6 +10,7 @@ import { statusCommand } from "./commands/status.js"
 import { initCommand } from "./commands/init.js"
 import { tidyCommand } from "./commands/tidy.js"
 import { whichCommand } from "./commands/which.js"
+import { infoCommand } from "./commands/info.js"
 import { runDefaultCommand } from "./commands/default.js"
 
 const argv = cli({
@@ -27,6 +28,7 @@ const argv = cli({
     tidyCommand,
     initCommand,
     whichCommand,
+    infoCommand,
   ],
 })
 
