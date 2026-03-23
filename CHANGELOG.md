@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-03-23
+
+### 🚀 Features
+
+- Added the hello skill and pm info command
+- Breakdown of statuses in the status command
+- Tidy command will format parent ids as full references
+- Added the quick feature skill
+
+### 🐛 Bug Fixes
+
+- The tidy command now handles orphans correctly
+
+### 🧪 Testing
+
+- Added test for the cli space
+- Ensure parent refs work well in numeric and full format
+
 ## [0.3.0] - 2026-03-23
 
 ### ⚙️ Miscellaneous Tasks
