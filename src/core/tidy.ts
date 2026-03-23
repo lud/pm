@@ -43,9 +43,6 @@ export type TidyEditOp = {
 export type TidyMoveOp = {
   from: string
   to: string
-  /** If the source has intermediateDir, the directory to rename */
-  fromDir?: string
-  toDir?: string
 }
 
 export type TidyPlan = {
@@ -138,45 +135,95 @@ function buildIdMapping(
 // Step 3: Compute expected paths (relocations)
 // ---------------------------------------------------------------------------
 
-function computeExpectedPath(
-  doc: DocumentEntry,
+/**
+ * Compute expected paths for all documents, processing parents before children
+ * so that children resolve against the parent's expected (not current) path.
+ *
+ * Returns a map from document absolute path → expected absolute path.
+ */
+function computeAllExpectedPaths(
+  docs: DocumentEntry[],
   project: ResolvedProject,
   docById: Map<number, DocumentEntry>,
   idRemapping: Map<string, number>,
-): string {
-  const doctype = doc.doctype
+): Map<string, string> {
+  const result = new Map<string, string>()
 
-  // Determine base directory
-  let baseDir: string
-  if (doctype.parent === undefined || doc.parentId === null) {
-    baseDir = project.projectDir
-  } else {
-    // Resolve parent — use the remapped ID if the parent was remapped
-    const parentDoc = docById.get(doc.parentId)
-    if (parentDoc) {
-      baseDir = getSelfDirectory(parentDoc)
+  // Sort by depth (documents with no parent first, then their children, etc.)
+  const sorted = topoSortByParent(docs, docById)
+
+  for (const doc of sorted) {
+    const doctype = doc.doctype
+    const newId = idRemapping.get(doc.path) ?? doc.id
+    const filename = formatDocumentFilename(
+      newId,
+      doc.tag,
+      doc.slug,
+      project.idPadWidth,
+    )
+
+    // Determine base directory
+    let baseDir: string
+    if (doctype.parent === undefined || doc.parentId === null) {
+      baseDir = project.projectDir
     } else {
-      // Parent not found — orphan case, keep current location
-      return doc.path
+      const parentDoc = docById.get(doc.parentId)
+      if (parentDoc) {
+        // Use the parent's EXPECTED path to compute self directory
+        const parentExpectedPath = result.get(parentDoc.path) ?? parentDoc.path
+        baseDir = dirname(parentExpectedPath)
+      } else {
+        // Parent not found — orphan, keep current location
+        result.set(doc.path, doc.path)
+        continue
+      }
+    }
+
+    // Append doctype's dir
+    const targetDir = doctype.dir === "." ? baseDir : join(baseDir, doctype.dir)
+
+    if (doctype.intermediateDir) {
+      const dirName = filename.replace(/\.md$/, "")
+      result.set(doc.path, join(targetDir, dirName, filename))
+    } else {
+      result.set(doc.path, join(targetDir, filename))
     }
   }
 
-  // Append doctype's dir
-  const targetDir = doctype.dir === "." ? baseDir : join(baseDir, doctype.dir)
-
-  // Compute filename with potentially new ID
-  const newId = idRemapping.get(doc.path) ?? doc.id
-  const filename = formatDocumentFilename(newId, doc.tag, doc.slug)
-
-  if (doctype.intermediateDir) {
-    const dirName = filename.replace(/\.md$/, "")
-    return join(targetDir, dirName, filename)
-  }
-  return join(targetDir, filename)
+  return result
 }
 
-function getSelfDirectory(doc: DocumentEntry): string {
-  return dirname(doc.path)
+/**
+ * Sort documents so that parents come before their children.
+ */
+function topoSortByParent(
+  docs: DocumentEntry[],
+  docById: Map<number, DocumentEntry>,
+): DocumentEntry[] {
+  const visited = new Set<string>()
+  const sorted: DocumentEntry[] = []
+  const docByPath = new Map(docs.map((d) => [d.path, d]))
+
+  function visit(doc: DocumentEntry) {
+    if (visited.has(doc.path)) return
+    visited.add(doc.path)
+
+    // Visit parent first
+    if (doc.parentId !== null) {
+      const parent = docById.get(doc.parentId)
+      if (parent && docByPath.has(parent.path)) {
+        visit(parent)
+      }
+    }
+
+    sorted.push(doc)
+  }
+
+  for (const doc of docs) {
+    visit(doc)
+  }
+
+  return sorted
 }
 
 // ---------------------------------------------------------------------------
@@ -290,12 +337,18 @@ export async function buildTidyPlan(
   }
 
   // Build mappings and detect relocations
+  const expectedPaths = computeAllExpectedPaths(
+    docs,
+    project,
+    docById,
+    idRemapping,
+  )
   const mappings: TidyMapping[] = []
   const moves: TidyMoveOp[] = []
 
   for (const doc of docs) {
     const newId = idRemapping.get(doc.path) ?? doc.id
-    const expectedPath = computeExpectedPath(doc, project, docById, idRemapping)
+    const expectedPath = expectedPaths.get(doc.path) ?? doc.path
 
     const idChanged = newId !== doc.id
     const pathChanged = expectedPath !== doc.path
@@ -309,16 +362,7 @@ export async function buildTidyPlan(
     })
 
     if (pathChanged) {
-      if (doc.doctype.intermediateDir) {
-        moves.push({
-          from: doc.path,
-          to: expectedPath,
-          fromDir: dirname(doc.path),
-          toDir: dirname(expectedPath),
-        })
-      } else {
-        moves.push({ from: doc.path, to: expectedPath })
-      }
+      moves.push({ from: doc.path, to: expectedPath })
     }
   }
 
@@ -339,24 +383,39 @@ export function applyTidyPlan(plan: TidyPlan): void {
     writeFileSyncOrAbort(edit.path, newContent)
   }
 
-  // 2. Rename files that got new IDs (update frontmatter-adjacent filename)
-  // This is handled by the moves — a file with a new ID will have a new path
-
-  // 3. Move/relocate files
+  // 2. Collect source directories that may become empty after moves
+  const sourceDirs = new Set<string>()
   for (const move of plan.moves) {
-    if (move.fromDir && move.toDir) {
-      // intermediateDir: rename the whole directory
-      mkdirSyncOrAbort(dirname(move.toDir), { recursive: true })
-      renameSync(move.fromDir, move.toDir)
-    } else {
-      mkdirSyncOrAbort(dirname(move.to), { recursive: true })
-      renameSync(move.from, move.to)
-    }
+    sourceDirs.add(dirname(move.from))
+  }
+
+  // 3. Move files: create target directory, rename file
+  for (const move of plan.moves) {
+    mkdirSyncOrAbort(dirname(move.to), { recursive: true })
+    _renameSync(move.from, move.to)
+  }
+
+  // 4. Clean up empty source directories (bottom-up by path length)
+  const sortedDirs = [...sourceDirs].sort((a, b) => b.length - a.length)
+  for (const dir of sortedDirs) {
+    tryRemoveEmptyDir(dir)
   }
 }
 
-// Sync rename wrapper
-function renameSync(from: string, to: string): void {
-  const { renameSync: _rename } = require("node:fs")
-  _rename(from, to)
+function _renameSync(from: string, to: string): void {
+  const { renameSync } = require("node:fs") as typeof import("node:fs")
+  renameSync(from, to)
+}
+
+function tryRemoveEmptyDir(dir: string): void {
+  const { readdirSync, rmdirSync } =
+    require("node:fs") as typeof import("node:fs")
+  try {
+    const entries = readdirSync(dir)
+    if (entries.length === 0) {
+      rmdirSync(dir)
+    }
+  } catch {
+    // Directory doesn't exist or can't be read — fine
+  }
 }

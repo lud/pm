@@ -2,11 +2,14 @@ import { describe, it, expect } from "vitest"
 import { join } from "node:path"
 import { resolveProject } from "../lib/project.js"
 import { listDocuments, getStatusSummary } from "./listing.js"
+import { createTestWorkspace } from "../lib/test-workspace.js"
 
 const FIXTURE_DIR = join(
   import.meta.dirname,
   "../../test/fixtures/basic-project",
 )
+
+const workspace = createTestWorkspace("listing")
 
 function loadFixtureProject() {
   return resolveProject(
@@ -98,6 +101,44 @@ describe("listDocuments", () => {
     const entries = listDocuments(project, { active: true, done: true })
     const feat = entries.find((e) => e.id === 1)
     expect(feat!.title).toBe("User authentication")
+  })
+
+  it("sorts results by ID, not by filesystem order", () => {
+    // Create files where path order differs from ID order
+    // With idMask "0", ID 9 sorts before ID 10 in filesystem (9. < 10. lexically?
+    // Actually "9." > "10." lexically since '9' > '1'. So let's use IDs that
+    // clearly differ: ID 2 and ID 10, where "10." < "2." lexically)
+    const dir = workspace.dir("sort-by-id")
+    const { mkdirSync, writeFileSync } = require("node:fs")
+    const featDir = join(dir, "features")
+    mkdirSync(featDir, { recursive: true })
+    writeFileSync(
+      join(dir, ".pm.json"),
+      JSON.stringify({
+        idMask: "0",
+        doctypes: { feature: { dir: "features" } },
+      }),
+    )
+    // ID 10 comes before ID 2 in lexical filesystem order ("10." < "2.")
+    mkdirSync(join(featDir, "10.feat.ten"), { recursive: true })
+    writeFileSync(
+      join(featDir, "10.feat.ten", "10.feat.ten.md"),
+      "---\ntitle: Ten\nstatus: new\n---\n",
+    )
+    mkdirSync(join(featDir, "2.feat.two"), { recursive: true })
+    writeFileSync(
+      join(featDir, "2.feat.two", "2.feat.two.md"),
+      "---\ntitle: Two\nstatus: new\n---\n",
+    )
+
+    const project = resolveProject(
+      { idMask: "0", doctypes: { feature: { dir: "features" } } },
+      join(dir, ".pm.json"),
+    )
+    const entries = listDocuments(project, { active: true, done: true })
+    const ids = entries.map((e) => e.id)
+    // Should be sorted by numeric ID, not filesystem order
+    expect(ids).toEqual([2, 10])
   })
 })
 

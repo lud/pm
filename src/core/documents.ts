@@ -156,7 +156,12 @@ export function createDocument(
   const targetDir = resolveTargetDirectory(project, doctype, options.parentId)
 
   // Build filename
-  const filename = formatDocumentFilename(id, doctype.tag, slug)
+  const filename = formatDocumentFilename(
+    id,
+    doctype.tag,
+    slug,
+    project.idPadWidth,
+  )
 
   // Determine final path
   let filePath: string

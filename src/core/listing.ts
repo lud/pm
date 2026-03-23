@@ -103,6 +103,7 @@ export function listDocuments(
     })
   }
 
+  results.sort((a, b) => a.id - b.id)
   return results
 }
 

@@ -21,8 +21,14 @@ const DoctypeSchema = z.object({
 
 export type DoctypeConfig = z.infer<typeof DoctypeSchema>
 
+const IdMaskSchema = z
+  .string()
+  .regex(/^0{1,10}$/)
+  .default("000")
+
 export const ProjectConfigSchema = z.object({
   $schema: z.string().optional(),
+  idMask: IdMaskSchema,
   doctypes: z.record(z.string(), DoctypeSchema).default({}),
 })
 
@@ -65,6 +71,7 @@ export type ResolvedDoctype = Omit<DoctypeConfig, "dir"> & {
 export type ResolvedProject = {
   projectFile: string
   projectDir: string
+  idPadWidth: number
   doctypes: Record<string, ResolvedDoctype>
 }
 
@@ -262,6 +269,7 @@ export function resolveProject(
   return {
     projectFile,
     projectDir,
+    idPadWidth: config.idMask.length,
     doctypes: resolved,
   }
 }

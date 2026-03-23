@@ -209,6 +209,37 @@ describe("createDocument", () => {
     // Feature 1 has intermediateDir, so its self dir is its own directory
     expect(result.path).toContain("001.feat.user-auth")
   })
+
+  it("overflows idMask without problems", () => {
+    // Create a project with idMask "0" (single digit) and a document with ID 9
+    const dir = workspace.dir("overflow-mask")
+    const { mkdirSync, writeFileSync } = require("node:fs")
+    const featDir = join(dir, "features", "9.feat.nine")
+    mkdirSync(featDir, { recursive: true })
+    writeFileSync(
+      join(dir, ".pm.json"),
+      JSON.stringify({
+        idMask: "0",
+        doctypes: { feature: { dir: "features" } },
+      }),
+    )
+    writeFileSync(
+      join(featDir, "9.feat.nine.md"),
+      "---\ntitle: Feature nine\nstatus: new\n---\n",
+    )
+
+    const project = resolveProject(
+      { idMask: "0", doctypes: { feature: { dir: "features" } } },
+      join(dir, ".pm.json"),
+    )
+
+    // Next ID should be 10, and the filename should be "10.feat.ten.md"
+    const result = createDocument(project, "feature", "Ten")
+    expect(result.id).toBe(10)
+    expect(result.path).toContain("10.feat.ten")
+    // The prefix is "10", not "010" — mask is just "0" (single digit)
+    expect(result.path).not.toContain("010")
+  })
 })
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,21 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { join } from "node:path"
 import { readFileSync, existsSync } from "node:fs"
-import { resolveProject } from "../lib/project.js"
+
+vi.mock("../lib/cli.js", async () => {
+  const actual = (await vi.importActual("../lib/cli.js")) as Record<
+    string,
+    unknown
+  >
+  return {
+    ...actual,
+    abortError: vi.fn((msg: string) => {
+      throw new Error(msg)
+    }),
+  }
+})
+
+import { resolveProject, loadProjectFile } from "../lib/project.js"
 import { parseFrontmatter } from "../lib/frontmatter.js"
 import { createTestWorkspace } from "../lib/test-workspace.js"
 import { buildTidyPlan, applyTidyPlan, type DocumentEntry } from "./tidy.js"
@@ -19,25 +33,16 @@ const DUPE_FIXTURE = join(
 const workspace = createTestWorkspace("tidy")
 
 function loadProject(fixtureDir: string) {
-  return resolveProject(
-    { doctypes: { feature: { dir: "context/features" } } },
-    join(fixtureDir, ".pm.json"),
-  )
+  return loadProjectFile(join(fixtureDir, ".pm.json"))
 }
 
 function loadMutableProject(fixtureDir: string) {
   const dir = workspace.copyFixture(fixtureDir)
-  return resolveProject(
-    { doctypes: { feature: { dir: "context/features" } } },
-    join(dir, ".pm.json"),
-  )
+  return loadProjectFile(join(dir, ".pm.json"))
 }
 
 function reloadProject(projectDir: string) {
-  return resolveProject(
-    { doctypes: { feature: { dir: "context/features" } } },
-    join(projectDir, ".pm.json"),
-  )
+  return loadProjectFile(join(projectDir, ".pm.json"))
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +67,92 @@ describe("buildTidyPlan on clean project", () => {
       expect(m.idChanged).toBe(false)
       expect(m.pathChanged).toBe(false)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// idMask repadding
+// ---------------------------------------------------------------------------
+
+describe("buildTidyPlan with idMask change", () => {
+  it("renames intermediate directories when repadding", async () => {
+    // Copy basic-project and use idMask "0" (single digit)
+    const dir = workspace.copyFixture(BASIC_FIXTURE)
+    const { writeFileSync } = require("node:fs")
+    writeFileSync(
+      join(dir, ".pm.json"),
+      JSON.stringify({
+        idMask: "0",
+        doctypes: { feature: { dir: "context/features" } },
+      }),
+    )
+
+    const project = reloadProject(dir)
+    const plan = await buildTidyPlan(project)
+
+    // Every file gets its own move operation
+    expect(plan.moves).toHaveLength(4)
+
+    // Feature file moves into new directory
+    const featMove = plan.moves.find((m) =>
+      m.from.includes("001.feat.user-auth.md"),
+    )
+    expect(featMove).toBeDefined()
+    expect(featMove!.to).toContain("1.feat.user-auth/1.feat.user-auth.md")
+    // The parent directory in the target must NOT contain "001"
+    expect(featMove!.to).not.toMatch(/001\.feat/)
+
+    // Children must reference the NEW parent directory name, not the old one
+    const specMove = plan.moves.find((m) =>
+      m.from.includes("002.spec.login-flow"),
+    )
+    expect(specMove).toBeDefined()
+    expect(specMove!.to).toContain("1.feat.user-auth/2.spec.login-flow.md")
+    expect(specMove!.to).not.toMatch(/001\.feat/)
+
+    const taskMove = plan.moves.find((m) =>
+      m.from.includes("003.task.jwt-middleware"),
+    )
+    expect(taskMove).toBeDefined()
+    expect(taskMove!.to).toContain("1.feat.user-auth/3.task.jwt-middleware.md")
+    expect(taskMove!.to).not.toMatch(/001\.feat/)
+  })
+
+  it("applies repadding end-to-end", async () => {
+    const dir = workspace.copyFixture(BASIC_FIXTURE)
+    const { writeFileSync } = require("node:fs")
+    writeFileSync(
+      join(dir, ".pm.json"),
+      JSON.stringify({
+        idMask: "0",
+        doctypes: { feature: { dir: "context/features" } },
+      }),
+    )
+
+    const project = reloadProject(dir)
+    const plan = await buildTidyPlan(project)
+    applyTidyPlan(plan)
+
+    // Re-scan and verify
+    const newProject = reloadProject(dir)
+    const docs = collectAllDocuments(newProject)
+    const ids = docs.map((d) => d.id).sort((a, b) => a - b)
+    expect(ids).toEqual([1, 2, 3, 4])
+
+    // Verify the feature directory was renamed
+    const feat = docs.find((d) => d.id === 1)
+    expect(feat).toBeDefined()
+    expect(feat!.path).toContain("1.feat.user-auth/1.feat.user-auth.md")
+    expect(feat!.path).not.toContain("001.")
+
+    // Verify children are inside the renamed directory
+    const spec = docs.find((d) => d.id === 2)
+    expect(spec).toBeDefined()
+    expect(spec!.path).toContain("1.feat.user-auth/2.spec.login-flow.md")
+
+    // Verify idempotent
+    const plan2 = await buildTidyPlan(newProject)
+    expect(plan2.moves).toHaveLength(0)
   })
 })
 

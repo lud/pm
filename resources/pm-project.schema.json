@@ -5,6 +5,11 @@
     "$schema": {
       "type": "string"
     },
+    "idMask": {
+      "default": "000",
+      "type": "string",
+      "pattern": "^0{1,10}$"
+    },
     "doctypes": {
       "default": {},
       "type": "object",
