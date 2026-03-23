@@ -5,6 +5,14 @@
   "bin": {
     "pm": "dist/main.js"
   },
+  "description": "File-based project management CLI for software developers working with AI coding assistants",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lud/pm.git"
+  },
+  "homepage": "https://github.com/lud/pm",
+  "bugs": "https://github.com/lud/pm/issues",
+  "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
   },
