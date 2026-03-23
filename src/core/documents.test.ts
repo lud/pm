@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { join } from "node:path"
-import { readFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 import { resolveProject } from "../lib/project.js"
 import { parseFrontmatter } from "../lib/frontmatter.js"
 import { createTestWorkspace } from "../lib/test-workspace.js"
@@ -72,6 +72,46 @@ describe("readDocument", () => {
 // ---------------------------------------------------------------------------
 
 describe("showDocument", () => {
+  it("resolves hierarchy when child uses numeric parent shorthand", () => {
+    const project = loadMutableProject()
+    const specPath = join(
+      project.projectDir,
+      "context/features/001.feat.user-auth/002.spec.login-flow.md",
+    )
+    const updated = readFileSync(specPath, "utf-8").replace(
+      "parent: 1.feat.user-auth",
+      "parent: 1",
+    )
+    writeFileSync(specPath, updated)
+
+    const specView = showDocument(project, 2)
+    expect(specView).not.toBeNull()
+    expect(specView!.parents).toHaveLength(1)
+    expect(specView!.parents[0].id).toBe(1)
+
+    const featureView = showDocument(project, 1)
+    expect(featureView).not.toBeNull()
+    const childIds = featureView!.children
+      .map((c) => c.id)
+      .sort((a, b) => a - b)
+    expect(childIds).toContain(2)
+  })
+
+  it("resolves hierarchy when child uses full parent reference", () => {
+    const project = loadFixtureProject()
+    const specView = showDocument(project, 2)
+    expect(specView).not.toBeNull()
+    expect(specView!.parents).toHaveLength(1)
+    expect(specView!.parents[0].id).toBe(1)
+
+    const featureView = showDocument(project, 1)
+    expect(featureView).not.toBeNull()
+    const childIds = featureView!.children
+      .map((c) => c.id)
+      .sort((a, b) => a - b)
+    expect(childIds).toContain(2)
+  })
+
   it("returns document with parents and children", () => {
     const project = loadFixtureProject()
     const result = showDocument(project, 2) // spec
@@ -140,6 +180,7 @@ describe("createDocument", () => {
     const content = readFileSync(result.path, "utf-8")
     const { data } = parseFrontmatter(content)
     expect(data.parent).toBe("1.feat.user-auth")
+    expect(data.parent).not.toBe(1)
     expect(data.title).toBe("API design")
   })
 

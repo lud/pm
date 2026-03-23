@@ -1,10 +1,11 @@
 ---
 name: pm-hello
 description:
-  Session bootstrap for projects managed with `pm`. Loads the pm-guide skill,
-  checks project status, resumes work on the current document or finds the next
-  thing to do. Use when the user says "where are we", "what's next", "continue
-  work", "give me the status on this project", or invokes /pm-hello.
+  Session bootstrap for projects managed with `pm`. Load the pm-guide skill,
+  check project status, resume work on the current document, or find the next
+  thing to do. Use this whenever the user asks where work stands, what to do
+  next, to continue work, to resume a session, for project status, or invokes
+  /pm-hello.
 user-invocable: true
 ---
 

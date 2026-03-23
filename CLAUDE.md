@@ -65,15 +65,15 @@ Commands are built with [cleye](https://github.com/privatenumber/cleye). Each co
 
 Use these functions for all output in day-to-day commands:
 
-| Function         | Behavior                                                            |
-| ---------------- | ------------------------------------------------------------------- |
-| `write(text)`    | stdout, no newline                                                  |
-| `writeln(text)`  | stdout + newline                                                    |
-| `info(text)`     | alias for `writeln`                                                 |
-| `warning(text)`  | yellow text                                                         |
+| Function         | Behavior                                                           |
+| ---------------- | ------------------------------------------------------------------ |
+| `write(text)`    | stdout, no newline                                                 |
+| `writeln(text)`  | stdout + newline                                                   |
+| `info(text)`     | alias for `writeln`                                                |
+| `warning(text)`  | yellow text                                                        |
 | `error(message)` | red text; accepts `string` or `{ message: string }` (e.g. `Error`) |
-| `debug(text)`    | cyan text                                                           |
-| `success(text)`  | green text                                                          |
+| `debug(text)`    | cyan text                                                          |
+| `success(text)`  | green text                                                         |
 
 ## File system helpers (`src/lib/fs-helpers.ts`)
 
@@ -97,7 +97,7 @@ Paths printed by commands are relative to CWD when the path is a child of CWD, o
 Documents are markdown files with YAML frontmatter. Filename format: `{ID}.{tag}.{slug}.md` (e.g. `001.feat.user-auth.md`).
 
 - **IDs are global integers** — unique across all doctypes. `001`, `1`, and `0001` all refer to the same document.
-- **Parent references** are stored as numeric IDs in frontmatter (`parent: 1`).
+- **Parent references** are normally stored in frontmatter as `{id}.{tag}.{slug}` (for example, `parent: 1.feat.user-auth`). PM also accepts a numeric ID alone (`parent: 1`) as a shorthand for manual edits and backwards compatibility.
 - **Statuses** are free-form strings. Each doctype defines `doneStatuses` — statuses that mean "no more work needed."
 
 ## Testing

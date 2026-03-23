@@ -1,9 +1,11 @@
 ---
 name: pm-quick-feature
 description:
-  Capture a feature idea that came up during a conversation. Creates a new pm
-  feature document with structured notes from the discussion. Use only when the
-  user explicitly invokes /quick-feature.
+  Capture a feature idea from the current conversation and create a new pm
+  feature document with structured notes from that discussion. Use only when the
+  user explicitly invokes /quick-feature to park an idea for later. Do not
+  auto-invoke this skill for incidental ideas, brainstorming, or speculative
+  discussion.
 user-invocable: true
 disable-model-invocation: true
 ---

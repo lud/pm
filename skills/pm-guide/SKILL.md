@@ -1,9 +1,10 @@
 ---
 name: pm-guide
 description:
-  Guide for using the `pm` project management CLI. Auto-load this when you
-  detect a `.pm.json` file in the project or when the user mentions features,
-  specs, tasks, or project management documents.
+  Guide for using the `pm` project management CLI in any pm-managed project.
+  Use this whenever you detect a `.pm.json` file or when the user mentions
+  features, specs, tasks, current work, project status, or project management
+  documents, even if they do not explicitly ask for `pm` help.
 user-invocable: true
 ---
 
@@ -59,8 +60,9 @@ created_on: 2026-03-23
 ---
 ```
 
-- `parent` — references the parent document as `{id}.{tag}.{slug}`. Omitted for
-  root documents.
+- `parent` — usually references the parent document as `{id}.{tag}.{slug}`.
+  PM also accepts a numeric ID alone as a shorthand when editing manually.
+  Omitted for root documents.
 - `title` — human-readable title.
 - `status` — free-form string. Each doctype defines "done statuses" that mark
   work as complete.
@@ -151,6 +153,9 @@ pm current 003                               # Set document 003 as current
 - Always start by running `pm status` to understand the project state.
 - Use `pm show <id>` to understand a document's position in the hierarchy.
 - When creating specs or tasks, always provide the `-p` flag with the parent ID.
+- When editing frontmatter directly, you may set `parent` to just the numeric ID
+  like `1` as a shorthand, but the full `{id}.{tag}.{slug}` form is also valid
+  and is the usual canonical format.
 - Use `pm current <id>` to track what you're working on — the next session will
   pick up from there.
 - Statuses are free-form. Common ones: `new`, `in-progress`, `blocked`,
