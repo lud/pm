@@ -3,7 +3,10 @@ import { join } from "node:path"
 import { resolveProject } from "../lib/project.js"
 import { listDocuments, getStatusSummary } from "./listing.js"
 
-const FIXTURE_DIR = join(import.meta.dirname, "../../test/fixtures/basic-project")
+const FIXTURE_DIR = join(
+  import.meta.dirname,
+  "../../test/fixtures/basic-project",
+)
 
 function loadFixtureProject() {
   return resolveProject(
@@ -17,7 +20,7 @@ function loadFixtureProject() {
 // ---------------------------------------------------------------------------
 
 describe("listDocuments", () => {
-  it("lists all open documents by default", () => {
+  it("lists all active documents by default", () => {
     const project = loadFixtureProject()
     const entries = listDocuments(project)
     // Doc 3 is done, so should be excluded
@@ -25,22 +28,26 @@ describe("listDocuments", () => {
     expect(ids).toEqual([1, 2, 4])
   })
 
-  it("lists closed documents with --closed", () => {
+  it("lists done documents with --done", () => {
     const project = loadFixtureProject()
-    const entries = listDocuments(project, { closed: true })
+    const entries = listDocuments(project, { done: true })
     const ids = entries.map((e) => e.id)
     expect(ids).toEqual([3])
   })
 
-  it("lists all documents with --open and --closed", () => {
+  it("lists all documents with --active and --done", () => {
     const project = loadFixtureProject()
-    const entries = listDocuments(project, { open: true, closed: true })
+    const entries = listDocuments(project, { active: true, done: true })
     expect(entries).toHaveLength(4)
   })
 
   it("filters by doctype", () => {
     const project = loadFixtureProject()
-    const entries = listDocuments(project, { doctype: "task", open: true, closed: true })
+    const entries = listDocuments(project, {
+      doctype: "task",
+      active: true,
+      done: true,
+    })
     const ids = entries.map((e) => e.id).sort((a, b) => a - b)
     expect(ids).toEqual([3, 4])
   })
@@ -55,7 +62,11 @@ describe("listDocuments", () => {
   it("filters by parent (descendants)", () => {
     const project = loadFixtureProject()
     // Descendants of feature 1: spec 2, task 3, task 4
-    const entries = listDocuments(project, { parentId: 1, open: true, closed: true })
+    const entries = listDocuments(project, {
+      parentId: 1,
+      active: true,
+      done: true,
+    })
     const ids = entries.map((e) => e.id).sort((a, b) => a - b)
     expect(ids).toEqual([2, 3, 4])
   })
@@ -63,20 +74,28 @@ describe("listDocuments", () => {
   it("filters descendants of spec (only direct and indirect children)", () => {
     const project = loadFixtureProject()
     // Descendants of spec 2: task 3, task 4
-    const entries = listDocuments(project, { parentId: 2, open: true, closed: true })
+    const entries = listDocuments(project, {
+      parentId: 2,
+      active: true,
+      done: true,
+    })
     const ids = entries.map((e) => e.id).sort((a, b) => a - b)
     expect(ids).toEqual([3, 4])
   })
 
   it("returns empty for parent with no descendants", () => {
     const project = loadFixtureProject()
-    const entries = listDocuments(project, { parentId: 3, open: true, closed: true })
+    const entries = listDocuments(project, {
+      parentId: 3,
+      active: true,
+      done: true,
+    })
     expect(entries).toHaveLength(0)
   })
 
   it("includes title from frontmatter", () => {
     const project = loadFixtureProject()
-    const entries = listDocuments(project, { open: true, closed: true })
+    const entries = listDocuments(project, { active: true, done: true })
     const feat = entries.find((e) => e.id === 1)
     expect(feat!.title).toBe("User authentication")
   })
@@ -87,13 +106,17 @@ describe("listDocuments", () => {
 // ---------------------------------------------------------------------------
 
 describe("getStatusSummary", () => {
-  it("returns open/closed counts per doctype", () => {
+  it("returns active/done counts per doctype", () => {
     const project = loadFixtureProject()
     const summary = getStatusSummary(project)
 
     const byDoctype = Object.fromEntries(summary.map((s) => [s.doctype, s]))
-    expect(byDoctype.feature).toEqual({ doctype: "feature", open: 1, closed: 0 })
-    expect(byDoctype.spec).toEqual({ doctype: "spec", open: 1, closed: 0 })
-    expect(byDoctype.task).toEqual({ doctype: "task", open: 1, closed: 1 })
+    expect(byDoctype.feature).toEqual({
+      doctype: "feature",
+      active: 1,
+      done: 0,
+    })
+    expect(byDoctype.spec).toEqual({ doctype: "spec", active: 1, done: 0 })
+    expect(byDoctype.task).toEqual({ doctype: "task", active: 1, done: 1 })
   })
 })

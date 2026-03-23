@@ -49,7 +49,8 @@ export const editCommand = command(
     try {
       const doc = editDocument(project, id, {
         setParent,
-        setProperties: Object.keys(properties).length > 0 ? properties : undefined,
+        setProperties:
+          Object.keys(properties).length > 0 ? properties : undefined,
       })
 
       touchCurrent(project.projectDir)

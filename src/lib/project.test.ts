@@ -1,11 +1,16 @@
 import { describe, it, expect, vi } from "vitest"
 import { join } from "node:path"
-import { resolveProject, locateProjectFile, loadProjectFile, DEFAULT_DOCTYPES } from "./project.js"
+import {
+  resolveProject,
+  locateProjectFile,
+  loadProjectFile,
+  DEFAULT_DOCTYPES,
+} from "./project.js"
 import { createTestWorkspace } from "./test-workspace.js"
 
 // Mock cli.ts so abortError throws instead of calling process.exit
 vi.mock("./cli.js", async () => {
-  const actual = await vi.importActual("./cli.js") as Record<string, unknown>
+  const actual = (await vi.importActual("./cli.js")) as Record<string, unknown>
   return {
     ...actual,
     abortError: vi.fn((msg: string) => {
@@ -16,7 +21,10 @@ vi.mock("./cli.js", async () => {
 
 const workspace = createTestWorkspace("project")
 
-function resolve(rawConfig: Record<string, unknown>, projectDir = "/test/project") {
+function resolve(
+  rawConfig: Record<string, unknown>,
+  projectDir = "/test/project",
+) {
   return resolveProject(rawConfig, `${projectDir}/.pm.json`)
 }
 
@@ -41,14 +49,14 @@ describe("resolveProject", () => {
       expect(project.doctypes.feature.intermediateDir).toBe(true)
     })
 
-    it("allows overriding default closedStatuses", () => {
+    it("allows overriding default doneStatuses", () => {
       const project = resolve({
         doctypes: {
           feature: { dir: "features" },
-          spec: { closedStatuses: ["done", "specified"] },
+          spec: { doneStatuses: ["done", "specified"] },
         },
       })
-      expect(project.doctypes.spec.closedStatuses).toEqual(["done", "specified"])
+      expect(project.doctypes.spec.doneStatuses).toEqual(["done", "specified"])
     })
 
     it("removes a default doctype when set to null", () => {
@@ -71,7 +79,9 @@ describe("resolveProject", () => {
         "/home/user/myproject",
       )
       expect(project.projectDir).toBe("/home/user/myproject")
-      expect(project.doctypes.feature.absDir).toBe("/home/user/myproject/context/features")
+      expect(project.doctypes.feature.absDir).toBe(
+        "/home/user/myproject/context/features",
+      )
     })
 
     it("resolves '.' dir relative to projectDir", () => {
@@ -182,14 +192,14 @@ describe("resolveProject", () => {
   })
 
   describe("default field values", () => {
-    it("applies default closedStatuses", () => {
+    it("applies default doneStatuses", () => {
       const project = resolve({
         doctypes: {
           feature: { dir: "features" },
           custom: { tag: "cust", dir: "stuff" },
         },
       })
-      expect(project.doctypes.custom.closedStatuses).toEqual(["done"])
+      expect(project.doctypes.custom.doneStatuses).toEqual(["done"])
     })
 
     it("applies default status", () => {
@@ -238,9 +248,9 @@ describe("locateProjectFile", () => {
     // Use a deep tmp dir that definitely has no .pm.json up the chain
     // This will walk up to / and fail. But to avoid walking the whole FS,
     // we just test that it throws for a nonexistent isolated path.
-    expect(() => locateProjectFile("/tmp/pm-test-nonexistent-" + Date.now())).toThrow(
-      /Could not locate .pm.json/,
-    )
+    expect(() =>
+      locateProjectFile("/tmp/pm-test-nonexistent-" + Date.now()),
+    ).toThrow(/Could not locate .pm.json/)
   })
 })
 
@@ -253,9 +263,12 @@ describe("loadProjectFile", () => {
     const dir = workspace.dir("load-valid")
     const { writeFileSync } = require("node:fs")
     const configPath = join(dir, ".pm.json")
-    writeFileSync(configPath, JSON.stringify({
-      doctypes: { feature: { dir: "features" } },
-    }))
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        doctypes: { feature: { dir: "features" } },
+      }),
+    )
     const project = loadProjectFile(configPath)
     expect(project.doctypes.feature.tag).toBe("feat")
     expect(project.projectDir).toBe(dir)
@@ -273,9 +286,12 @@ describe("loadProjectFile", () => {
     const dir = workspace.dir("load-invalid-config")
     const { writeFileSync } = require("node:fs")
     const configPath = join(dir, ".pm.json")
-    writeFileSync(configPath, JSON.stringify({
-      doctypes: { feature: { dir: "/absolute" } },
-    }))
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        doctypes: { feature: { dir: "/absolute" } },
+      }),
+    )
     expect(() => loadProjectFile(configPath)).toThrow(/dir must be relative/)
   })
 })

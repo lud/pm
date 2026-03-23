@@ -12,8 +12,8 @@ export type ListFilter = {
   doctype?: string
   parentId?: number
   status?: string
-  open?: boolean
-  closed?: boolean
+  active?: boolean
+  done?: boolean
 }
 
 export type ListEntry = {
@@ -28,8 +28,8 @@ export type ListEntry = {
 
 export type StatusSummary = {
   doctype: string
-  open: number
-  closed: number
+  active: number
+  done: number
 }
 
 // ---------------------------------------------------------------------------
@@ -71,21 +71,21 @@ export function listDocuments(
       continue
     }
 
-    // Filter by open/closed
-    const isClosed = status !== undefined &&
-      doc.doctype.closedStatuses.includes(status)
+    // Filter by active/done
+    const isDone =
+      status !== undefined && doc.doctype.doneStatuses.includes(status)
 
-    const showBoth = filter.open && filter.closed
+    const showBoth = filter.active && filter.done
     if (!showBoth) {
-      if (filter.open && isClosed) continue
-      if (filter.closed && !isClosed) continue
+      if (filter.active && isDone) continue
+      if (filter.done && !isDone) continue
 
-      // Default: show open only (when no explicit status filter)
+      // Default: show active only (when no explicit status filter)
       if (
         filter.status === undefined &&
-        !filter.open &&
-        !filter.closed &&
-        isClosed
+        !filter.active &&
+        !filter.done &&
+        isDone
       ) {
         continue
       }
@@ -109,32 +109,30 @@ export function listDocuments(
 // Status summary
 // ---------------------------------------------------------------------------
 
-export function getStatusSummary(
-  project: ResolvedProject,
-): StatusSummary[] {
+export function getStatusSummary(project: ResolvedProject): StatusSummary[] {
   const allDocs = collectAllDocuments(project)
-  const counts = new Map<string, { open: number; closed: number }>()
+  const counts = new Map<string, { active: number; done: number }>()
 
   for (const doc of allDocs) {
     const content = readFileSync(doc.path, "utf-8")
     const { data } = parseFrontmatter(content)
     const status = typeof data.status === "string" ? data.status : undefined
-    const isClosed = status !== undefined &&
-      doc.doctype.closedStatuses.includes(status)
+    const isDone =
+      status !== undefined && doc.doctype.doneStatuses.includes(status)
 
-    const entry = counts.get(doc.doctype.name) ?? { open: 0, closed: 0 }
-    if (isClosed) {
-      entry.closed++
+    const entry = counts.get(doc.doctype.name) ?? { active: 0, done: 0 }
+    if (isDone) {
+      entry.done++
     } else {
-      entry.open++
+      entry.active++
     }
     counts.set(doc.doctype.name, entry)
   }
 
-  return Array.from(counts.entries()).map(([doctype, { open, closed }]) => ({
+  return Array.from(counts.entries()).map(([doctype, { active, done }]) => ({
     doctype,
-    open,
-    closed,
+    active,
+    done,
   }))
 }
 

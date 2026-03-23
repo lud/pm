@@ -1,7 +1,11 @@
 import { join, dirname } from "node:path"
 import { readFileSync } from "node:fs"
 import { mkdirSyncOrAbort, writeFileSyncOrAbort } from "../lib/fs-helpers.js"
-import { parseFrontmatter, prependFrontmatter, setFrontmatterProperties } from "../lib/frontmatter.js"
+import {
+  parseFrontmatter,
+  prependFrontmatter,
+  setFrontmatterProperties,
+} from "../lib/frontmatter.js"
 import type { ResolvedProject, ResolvedDoctype } from "../lib/project.js"
 import {
   findDocumentById,
@@ -245,24 +249,21 @@ export function editDocument(
 // Mark document as done
 // ---------------------------------------------------------------------------
 
-export function markDone(
-  project: ResolvedProject,
-  id: number,
-): DocumentInfo {
+export function markDone(project: ResolvedProject, id: number): DocumentInfo {
   const doc = readDocument(project, id)
   if (!doc) {
     throw new Error(`Document ${id} not found`)
   }
 
-  const closedStatus = doc.doctype.closedStatuses[0]
-  if (!closedStatus) {
+  const doneStatus = doc.doctype.doneStatuses[0]
+  if (!doneStatus) {
     throw new Error(
-      `Doctype "${doc.doctype.name}" has no closed statuses defined`,
+      `Doctype "${doc.doctype.name}" has no done statuses defined`,
     )
   }
 
   return editDocument(project, id, {
-    setProperties: { status: closedStatus },
+    setProperties: { status: doneStatus },
   })
 }
 

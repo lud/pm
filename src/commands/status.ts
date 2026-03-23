@@ -20,7 +20,7 @@ export const statusCommand = command(
       cli.info("No documents found.")
     } else {
       for (const entry of summary) {
-        cli.info(`${entry.doctype}: ${entry.open} open, ${entry.closed} closed`)
+        cli.info(`${entry.doctype}: ${entry.active} active, ${entry.done} done`)
       }
     }
 

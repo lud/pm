@@ -14,9 +14,7 @@ export type ParsedFilename = {
   slug: string
 }
 
-export function parseDocumentFilename(
-  filename: string,
-): ParsedFilename | null {
+export function parseDocumentFilename(filename: string): ParsedFilename | null {
   const match = FILENAME_REGEX.exec(filename)
   if (!match) return null
   return {

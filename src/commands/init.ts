@@ -1,5 +1,10 @@
 import { command } from "cleye"
-import { existsSync, readFileSync, writeFileSync, appendFileSync } from "node:fs"
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  appendFileSync,
+} from "node:fs"
 import { join } from "node:path"
 import * as p from "@clack/prompts"
 

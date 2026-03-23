@@ -2,7 +2,12 @@ import { command } from "cleye"
 import { loadProjectFrom } from "../lib/project.js"
 import { showDocument } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
-import { getCurrentId, setCurrentId, clearCurrentId, touchCurrent } from "../core/current.js"
+import {
+  getCurrentId,
+  setCurrentId,
+  clearCurrentId,
+  touchCurrent,
+} from "../core/current.js"
 import { printShowResult } from "./show.js"
 import * as cli from "../lib/cli.js"
 

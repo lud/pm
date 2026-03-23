@@ -47,7 +47,9 @@ export function printShowResult(result: ShowResult, cwd: string): void {
     for (const parent of parents) {
       const status = parent.frontmatter.status ?? "(none)"
       const title = parent.frontmatter.title ?? parent.slug
-      cli.info(`  ${parent.doctype.name} ${String(parent.id).padStart(3, "0")} ${title} (${status})`)
+      cli.info(
+        `  ${parent.doctype.name} ${String(parent.id).padStart(3, "0")} ${title} (${status})`,
+      )
     }
   }
 
@@ -58,7 +60,9 @@ export function printShowResult(result: ShowResult, cwd: string): void {
     for (const child of children) {
       const status = child.frontmatter.status ?? "(none)"
       const title = child.frontmatter.title ?? child.slug
-      cli.info(`  ${child.doctype.name} ${String(child.id).padStart(3, "0")} ${title} (${status})`)
+      cli.info(
+        `  ${child.doctype.name} ${String(child.id).padStart(3, "0")} ${title} (${status})`,
+      )
     }
   }
 }

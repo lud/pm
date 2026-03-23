@@ -55,15 +55,21 @@ describe("parseDocumentFilename", () => {
 
 describe("formatDocumentFilename", () => {
   it("formats with default 3-digit padding", () => {
-    expect(formatDocumentFilename(1, "feat", "user-auth")).toBe("001.feat.user-auth.md")
+    expect(formatDocumentFilename(1, "feat", "user-auth")).toBe(
+      "001.feat.user-auth.md",
+    )
   })
 
   it("formats with custom padding", () => {
-    expect(formatDocumentFilename(5, "spec", "login", 5)).toBe("00005.spec.login.md")
+    expect(formatDocumentFilename(5, "spec", "login", 5)).toBe(
+      "00005.spec.login.md",
+    )
   })
 
   it("does not truncate IDs exceeding pad width", () => {
-    expect(formatDocumentFilename(1234, "task", "big", 3)).toBe("1234.task.big.md")
+    expect(formatDocumentFilename(1234, "task", "big", 3)).toBe(
+      "1234.task.big.md",
+    )
   })
 })
 
@@ -93,7 +99,10 @@ describe("parseDocumentRef", () => {
 // Scanner (uses real fixture files)
 // ---------------------------------------------------------------------------
 
-const FIXTURE_DIR = join(import.meta.dirname, "../../test/fixtures/basic-project")
+const FIXTURE_DIR = join(
+  import.meta.dirname,
+  "../../test/fixtures/basic-project",
+)
 
 function loadFixtureProject() {
   return resolveProject(

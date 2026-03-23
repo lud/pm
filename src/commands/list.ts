@@ -19,14 +19,14 @@ export const listCommand = command(
         alias: "p",
         description: "Filter to descendants of this document ID",
       },
-      open: {
+      active: {
         type: Boolean,
-        description: "Show open documents (default)",
+        description: "Show active documents (default)",
         default: false,
       },
-      closed: {
+      done: {
         type: Boolean,
-        description: "Show closed documents",
+        description: "Show done documents",
         default: false,
       },
       status: {
@@ -59,14 +59,16 @@ export const listCommand = command(
       filter.status = argv.flags.status
     }
 
-    if (argv.flags.open) filter.open = true
-    if (argv.flags.closed) filter.closed = true
+    if (argv.flags.active) filter.active = true
+    if (argv.flags.done) filter.done = true
 
     const entries = listDocuments(project, filter)
 
     for (const entry of entries) {
       const statusStr = entry.status ? ` (${entry.status})` : ""
-      cli.info(`${entry.tag} ${String(entry.id).padStart(3, "0")} ${entry.title}${statusStr}`)
+      cli.info(
+        `${entry.tag} ${String(entry.id).padStart(3, "0")} ${entry.title}${statusStr}`,
+      )
     }
   },
 )

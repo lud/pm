@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest"
 import { join } from "node:path"
 import { readFileSync, existsSync } from "node:fs"
 import { createTestWorkspace } from "../lib/test-workspace.js"
-import { getCurrentId, setCurrentId, clearCurrentId, touchCurrent } from "./current.js"
+import {
+  getCurrentId,
+  setCurrentId,
+  clearCurrentId,
+  touchCurrent,
+} from "./current.js"
 
 const workspace = createTestWorkspace("current")
 

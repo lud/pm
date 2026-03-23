@@ -12,7 +12,10 @@ import {
   markDone,
 } from "./documents.js"
 
-const FIXTURE_DIR = join(import.meta.dirname, "../../test/fixtures/basic-project")
+const FIXTURE_DIR = join(
+  import.meta.dirname,
+  "../../test/fixtures/basic-project",
+)
 const workspace = createTestWorkspace("documents")
 
 function loadFixtureProject() {
@@ -121,7 +124,9 @@ describe("createDocument", () => {
 
   it("creates a spec document with parent", () => {
     const project = loadMutableProject()
-    const result = createDocument(project, "spec", "API design", { parentId: 1 })
+    const result = createDocument(project, "spec", "API design", {
+      parentId: 1,
+    })
 
     expect(result.id).toBe(5)
     const content = readFileSync(result.path, "utf-8")
@@ -132,7 +137,9 @@ describe("createDocument", () => {
 
   it("creates a task document with parent spec", () => {
     const project = loadMutableProject()
-    const result = createDocument(project, "task", "Write tests", { parentId: 2 })
+    const result = createDocument(project, "task", "Write tests", {
+      parentId: 2,
+    })
 
     expect(result.id).toBe(5)
     const content = readFileSync(result.path, "utf-8")
@@ -252,7 +259,7 @@ describe("editDocument", () => {
 // ---------------------------------------------------------------------------
 
 describe("markDone", () => {
-  it("sets status to first closedStatus for feature", () => {
+  it("sets status to first doneStatus for feature", () => {
     const project = loadMutableProject()
     const doc = markDone(project, 1)
     expect(doc.frontmatter.status).toBe("done")

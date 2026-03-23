@@ -15,7 +15,7 @@ const DoctypeSchema = z.object({
   parent: z.string().optional(),
   requireParent: z.boolean().default(true),
   intermediateDir: z.boolean().default(false),
-  closedStatuses: z.array(z.string()).default(["done"]),
+  doneStatuses: z.array(z.string()).default(["done"]),
   defaultStatus: z.string().default("new"),
 })
 
@@ -36,19 +36,19 @@ export const DEFAULT_DOCTYPES: Record<string, Partial<DoctypeConfig>> = {
   feature: {
     tag: "feat",
     intermediateDir: true,
-    closedStatuses: ["done"],
+    doneStatuses: ["done"],
   },
   spec: {
     tag: "spec",
     dir: ".",
     parent: "feature",
-    closedStatuses: ["specified"],
+    doneStatuses: ["specified"],
   },
   task: {
     tag: "task",
     dir: ".",
     parent: "spec",
-    closedStatuses: ["done"],
+    doneStatuses: ["done"],
   },
 }
 
@@ -107,9 +107,7 @@ function mergeWithDefaults(
 // Validation (post-merge)
 // ---------------------------------------------------------------------------
 
-function validateDoctypes(
-  doctypes: Record<string, DoctypeConfig>,
-): void {
+function validateDoctypes(doctypes: Record<string, DoctypeConfig>): void {
   const tags = new Set<string>()
 
   for (const [name, dt] of Object.entries(doctypes)) {
@@ -132,7 +130,9 @@ function validateDoctypes(
       throw new Error(`Doctype "${name}" dir must be relative, got "${dt.dir}"`)
     }
     if (dt.dir.includes("..")) {
-      throw new Error(`Doctype "${name}" dir must not contain "..", got "${dt.dir}"`)
+      throw new Error(
+        `Doctype "${name}" dir must not contain "..", got "${dt.dir}"`,
+      )
     }
   }
 
@@ -142,7 +142,9 @@ function validateDoctypes(
     let current: string | undefined = name
     while (current !== undefined) {
       if (visited.has(current)) {
-        throw new Error(`Circular parent reference detected involving doctype "${name}"`)
+        throw new Error(
+          `Circular parent reference detected involving doctype "${name}"`,
+        )
       }
       visited.add(current)
       current = doctypes[current].parent
@@ -227,8 +229,12 @@ export function resolveProject(
     })
   } catch (err) {
     if (err instanceof z.ZodError) {
-      const issues = err.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`)
-      throw new Error(`Invalid project config in ${projectFile}:\n${issues.join("\n")}`)
+      const issues = err.issues.map(
+        (i) => `  ${i.path.join(".")}: ${i.message}`,
+      )
+      throw new Error(
+        `Invalid project config in ${projectFile}:\n${issues.join("\n")}`,
+      )
     }
     throw err
   }
