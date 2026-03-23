@@ -10,7 +10,7 @@ import { execSync } from "node:child_process"
 export const newCommand = command(
   {
     name: "new",
-    parameters: ["<doctype>", "<title>"],
+    parameters: ["<doctype>", "<title...>"],
     flags: {
       parent: {
         type: String,
@@ -33,7 +33,8 @@ export const newCommand = command(
   (argv) => {
     const project = loadProjectFrom(process.cwd())
     const doctypeName = argv._.doctype
-    const title = argv._.title
+    const titleParts = argv._.title as unknown as string[]
+    const title = titleParts.join(" ")
 
     let parentId: number | undefined
     if (argv.flags.parent) {
