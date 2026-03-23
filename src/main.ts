@@ -8,9 +8,11 @@ import { showCommand } from "./commands/show.js"
 import { currentCommand } from "./commands/current.js"
 import { statusCommand } from "./commands/status.js"
 import { initCommand } from "./commands/init.js"
+import { tidyCommand } from "./commands/tidy.js"
 import { whichCommand } from "./commands/which.js"
+import { runDefaultCommand } from "./commands/default.js"
 
-cli({
+const argv = cli({
   name: "pm",
   version: "0.1.0",
   commands: [
@@ -22,7 +24,12 @@ cli({
     showCommand,
     currentCommand,
     statusCommand,
+    tidyCommand,
     initCommand,
     whichCommand,
   ],
 })
+
+if (!argv.command) {
+  runDefaultCommand()
+}

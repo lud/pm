@@ -51,9 +51,9 @@ Commands are built with [cleye](https://github.com/privatenumber/cleye). Each co
 
 ### Two kinds of commands
 
-**Interactive commands** (e.g. `init`) guide the user through a workflow. These may use `@clack/prompts` for prompts, spinners, and styled output.
+**Interactive commands** (e.g. `init`) guide the user through a workflow. These may use ``@inquirer/prompts`` for prompts, spinners, and styled output.
 
-**Day-to-day commands** (e.g. `list`, `read`, `status`) are meant to be used in scripts, piped output, or called by LLMs/agents. These must use `src/lib/cli.ts` for all output — no `@clack/prompts`, no `console.log`.
+**Day-to-day commands** (e.g. `list`, `read`, `status`) are meant to be used in scripts, piped output, or called by LLMs/agents. These must use `src/lib/cli.ts` for all output — no ``@inquirer/prompts``, no `console.log`.
 
 ## Output module (`src/lib/cli.ts`)
 

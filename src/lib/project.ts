@@ -158,32 +158,37 @@ function validateDoctypes(doctypes: Record<string, DoctypeConfig>): void {
 
 /**
  * Walk up from `startDir` looking for `.pm.json`.
- * Returns the absolute path to the file, or aborts with an error.
+ * Returns the absolute path to the file, or null if not found.
  */
-export function locateProjectFile(startDir: string): string {
+export function tryLocateProjectFile(startDir: string): string | null {
   let dir = startDir
-  let lastError: string | null = null
   while (true) {
     const candidate = join(dir, ".pm.json")
     try {
       accessSync(candidate, constants.R_OK)
       return candidate
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code
-      if (code === "EACCES") {
-        lastError = `permission denied: ${dir}`
-      }
-      // ENOENT is normal — keep walking
+    } catch {
+      // not found or not readable — keep walking
     }
 
     const parentDir = dirname(dir)
     if (parentDir === dir) {
-      // Reached filesystem root
-      const detail = lastError ?? "not found"
-      abortError(`Could not locate .pm.json: ${detail}`)
+      return null
     }
     dir = parentDir
   }
+}
+
+/**
+ * Walk up from `startDir` looking for `.pm.json`.
+ * Returns the absolute path to the file, or aborts with an error.
+ */
+export function locateProjectFile(startDir: string): string {
+  const result = tryLocateProjectFile(startDir)
+  if (result === null) {
+    abortError("Could not locate .pm.json: not found")
+  }
+  return result
 }
 
 /**
