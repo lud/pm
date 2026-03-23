@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 import { parseFrontmatter } from "../lib/frontmatter.js"
 import type { ResolvedProject } from "../lib/project.js"
 import { collectAllDocuments, type ScannedDocument } from "./scanner.js"
+import { extractParentId } from "./parent-ref.js"
 import type { DocumentInfo } from "./documents.js"
 
 // ---------------------------------------------------------------------------
@@ -154,11 +155,11 @@ function findDescendantIds(
   for (const doc of allDocs) {
     const content = readFileSync(doc.path, "utf-8")
     const { data } = parseFrontmatter(content)
-    const parent = data.parent
-    if (typeof parent === "number") {
-      const children = childrenOf.get(parent) ?? []
+    const parentId = extractParentId(data.parent)
+    if (parentId !== null) {
+      const children = childrenOf.get(parentId) ?? []
       children.push(doc.id)
-      childrenOf.set(parent, children)
+      childrenOf.set(parentId, children)
     }
   }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect } from "vitest"
 import { join } from "node:path"
 import { readFileSync } from "node:fs"
 import { resolveProject } from "../lib/project.js"
@@ -56,6 +56,14 @@ describe("readDocument", () => {
     const project = loadFixtureProject()
     const doc = readDocument(project, 1)
     expect(doc!.body).toContain("Feature for user authentication")
+  })
+
+  it("does not include id in frontmatter", () => {
+    const project = loadFixtureProject()
+    const doc = readDocument(project, 1)
+    expect(doc!.frontmatter.id).toBeUndefined()
+    // But the id is available from the filename
+    expect(doc!.id).toBe(1)
   })
 })
 
@@ -116,13 +124,13 @@ describe("createDocument", () => {
     // Verify file exists and has correct frontmatter
     const content = readFileSync(result.path, "utf-8")
     const { data } = parseFrontmatter(content)
-    expect(data.id).toBe(5)
+    expect(data.id).toBeUndefined() // ID comes from filename, not frontmatter
     expect(data.title).toBe("Payment system")
     expect(data.status).toBe("new")
     expect(data.parent).toBeUndefined()
   })
 
-  it("creates a spec document with parent", () => {
+  it("creates a spec document with parent ref string", () => {
     const project = loadMutableProject()
     const result = createDocument(project, "spec", "API design", {
       parentId: 1,
@@ -131,11 +139,11 @@ describe("createDocument", () => {
     expect(result.id).toBe(5)
     const content = readFileSync(result.path, "utf-8")
     const { data } = parseFrontmatter(content)
-    expect(data.parent).toBe(1)
+    expect(data.parent).toBe("1.feat.user-auth")
     expect(data.title).toBe("API design")
   })
 
-  it("creates a task document with parent spec", () => {
+  it("creates a task document with parent spec ref", () => {
     const project = loadMutableProject()
     const result = createDocument(project, "task", "Write tests", {
       parentId: 2,
@@ -144,7 +152,7 @@ describe("createDocument", () => {
     expect(result.id).toBe(5)
     const content = readFileSync(result.path, "utf-8")
     const { data } = parseFrontmatter(content)
-    expect(data.parent).toBe(2)
+    expect(data.parent).toBe("2.spec.login-flow")
   })
 
   it("throws when required parent is missing", () => {
@@ -225,11 +233,10 @@ describe("editDocument", () => {
     expect(doc.frontmatter.priority).toBe("high")
   })
 
-  it("sets parent", () => {
+  it("sets parent as ref string", () => {
     const project = loadMutableProject()
-    // Task 4 already has parent 2 (spec). Let's verify we can set it.
     const doc = editDocument(project, 4, { setParent: 2 })
-    expect(doc.frontmatter.parent).toBe(2)
+    expect(doc.frontmatter.parent).toBe("2.spec.login-flow")
   })
 
   it("throws when setting parent to wrong doctype", () => {

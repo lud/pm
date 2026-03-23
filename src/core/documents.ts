@@ -14,6 +14,7 @@ import {
   collectAllDocuments,
   type ScannedDocument,
 } from "./scanner.js"
+import { formatParentRef, extractParentId } from "./parent-ref.js"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,12 +82,12 @@ export function showDocument(
 
   // Walk up parent chain
   const parents: DocumentInfo[] = []
-  let currentParentId = doc.frontmatter.parent
-  while (typeof currentParentId === "number" && currentParentId > 0) {
+  let currentParentId = extractParentId(doc.frontmatter.parent)
+  while (currentParentId !== null) {
     const parent = readDocument(project, currentParentId)
     if (!parent) break
     parents.unshift(parent) // prepend so root is first
-    currentParentId = parent.frontmatter.parent
+    currentParentId = extractParentId(parent.frontmatter.parent)
   }
 
   // Find children (requires full scan)
@@ -96,7 +97,7 @@ export function showDocument(
     if (scanned.id === id) continue
     const childContent = readFileSync(scanned.path, "utf-8")
     const { data } = parseFrontmatter(childContent)
-    if (data.parent === id) {
+    if (extractParentId(data.parent) === id) {
       children.push(loadDocumentInfo(scanned))
     }
   }
@@ -123,6 +124,7 @@ export function createDocument(
   }
 
   // Validate parent requirements
+  let parentDoc: DocumentInfo | null = null
   if (doctype.parent !== undefined) {
     if (doctype.requireParent && options.parentId === undefined) {
       throw new Error(
@@ -130,8 +132,7 @@ export function createDocument(
       )
     }
     if (options.parentId !== undefined) {
-      // Validate parent exists and is the right doctype
-      const parentDoc = readDocument(project, options.parentId)
+      parentDoc = readDocument(project, options.parentId)
       if (!parentDoc) {
         throw new Error(`Parent document ${options.parentId} not found`)
       }
@@ -169,16 +170,19 @@ export function createDocument(
     filePath = join(targetDir, filename)
   }
 
-  // Build frontmatter
+  // Build frontmatter — no `id` field (ID comes from filename)
   const status = options.status ?? doctype.defaultStatus
   const frontmatterData: Record<string, unknown> = {
-    id,
     title,
     status,
     created_on: new Date().toISOString().slice(0, 10),
   }
-  if (options.parentId !== undefined) {
-    frontmatterData.parent = options.parentId
+  if (parentDoc !== null) {
+    frontmatterData.parent = formatParentRef(
+      parentDoc.id,
+      parentDoc.tag,
+      parentDoc.slug,
+    )
   }
 
   // Write file
@@ -224,7 +228,11 @@ export function editDocument(
         `Parent document ${options.setParent} is a "${parentDoc.doctype.name}", expected "${parentDoctype}"`,
       )
     }
-    updates.parent = options.setParent
+    updates.parent = formatParentRef(
+      parentDoc.id,
+      parentDoc.tag,
+      parentDoc.slug,
+    )
   }
 
   // Handle property updates

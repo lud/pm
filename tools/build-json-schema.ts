@@ -8,10 +8,7 @@ const jsonSchema = z.toJSONSchema(ProjectConfigSchema, {
   io: "input",
 })
 
-const outPath = join(
-  import.meta.dirname,
-  "../resources/pm-project.schema.json",
-)
+const outPath = join(import.meta.dirname, "../resources/pm-project.schema.json")
 writeFileSync(outPath, JSON.stringify(jsonSchema, null, 2) + "\n")
 
 console.log(`Written ${outPath}`)
