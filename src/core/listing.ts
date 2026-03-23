@@ -27,10 +27,17 @@ export type ListEntry = {
   status: string | undefined
 }
 
+export type StatusCount = {
+  status: string
+  count: number
+  isDone: boolean
+}
+
 export type StatusSummary = {
   doctype: string
   active: number
   done: number
+  statuses: StatusCount[]
 }
 
 // ---------------------------------------------------------------------------
@@ -113,29 +120,59 @@ export function listDocuments(
 
 export function getStatusSummary(project: ResolvedProject): StatusSummary[] {
   const allDocs = collectAllDocuments(project)
-  const counts = new Map<string, { active: number; done: number }>()
+
+  const doctypeData = new Map<
+    string,
+    {
+      active: number
+      done: number
+      doneStatuses: string[]
+      statusCounts: Map<string, number>
+    }
+  >()
 
   for (const doc of allDocs) {
     const content = readFileSync(doc.path, "utf-8")
     const { data } = parseFrontmatter(content)
-    const status = typeof data.status === "string" ? data.status : undefined
+    const status = typeof data.status === "string" ? data.status : "(none)"
     const isDone =
-      status !== undefined && doc.doctype.doneStatuses.includes(status)
+      status !== "(none)" && doc.doctype.doneStatuses.includes(status)
 
-    const entry = counts.get(doc.doctype.name) ?? { active: 0, done: 0 }
+    const entry = doctypeData.get(doc.doctype.name) ?? {
+      active: 0,
+      done: 0,
+      doneStatuses: doc.doctype.doneStatuses,
+      statusCounts: new Map(),
+    }
+
     if (isDone) {
       entry.done++
     } else {
       entry.active++
     }
-    counts.set(doc.doctype.name, entry)
+    entry.statusCounts.set(status, (entry.statusCounts.get(status) ?? 0) + 1)
+    doctypeData.set(doc.doctype.name, entry)
   }
 
-  return Array.from(counts.entries()).map(([doctype, { active, done }]) => ({
-    doctype,
-    active,
-    done,
-  }))
+  return Array.from(doctypeData.entries()).map(
+    ([doctype, { active, done, doneStatuses, statusCounts }]) => {
+      const statuses = Array.from(statusCounts.entries()).map(
+        ([status, count]) => ({
+          status,
+          count,
+          isDone: doneStatuses.includes(status),
+        }),
+      )
+
+      // Non-terminal alphabetically, then terminal alphabetically
+      statuses.sort((a, b) => {
+        if (a.isDone !== b.isDone) return a.isDone ? 1 : -1
+        return a.status.localeCompare(b.status)
+      })
+
+      return { doctype, active, done, statuses }
+    },
+  )
 }
 
 // ---------------------------------------------------------------------------

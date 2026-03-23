@@ -146,18 +146,67 @@ describe("listDocuments", () => {
 // getStatusSummary
 // ---------------------------------------------------------------------------
 
+const MULTI_STATUS_DIR = join(
+  import.meta.dirname,
+  "../../test/fixtures/multi-status",
+)
+
+function loadMultiStatusProject() {
+  return resolveProject(
+    { doctypes: { feature: { dir: "context/features" } } },
+    join(MULTI_STATUS_DIR, ".pm.json"),
+  )
+}
+
 describe("getStatusSummary", () => {
   it("returns active/done counts per doctype", () => {
     const project = loadFixtureProject()
     const summary = getStatusSummary(project)
 
     const byDoctype = Object.fromEntries(summary.map((s) => [s.doctype, s]))
-    expect(byDoctype.feature).toEqual({
-      doctype: "feature",
-      active: 1,
-      done: 0,
-    })
-    expect(byDoctype.spec).toEqual({ doctype: "spec", active: 1, done: 0 })
-    expect(byDoctype.task).toEqual({ doctype: "task", active: 1, done: 1 })
+    expect(byDoctype.feature.active).toBe(1)
+    expect(byDoctype.feature.done).toBe(0)
+    expect(byDoctype.spec.active).toBe(1)
+    expect(byDoctype.spec.done).toBe(0)
+    expect(byDoctype.task.active).toBe(1)
+    expect(byDoctype.task.done).toBe(1)
+  })
+
+  it("includes per-status counts", () => {
+    const project = loadFixtureProject()
+    const summary = getStatusSummary(project)
+
+    const tasks = summary.find((s) => s.doctype === "task")!
+    expect(tasks.statuses).toHaveLength(2)
+
+    const newStatus = tasks.statuses.find((s) => s.status === "new")
+    expect(newStatus).toEqual({ status: "new", count: 1, isDone: false })
+
+    const doneStatus = tasks.statuses.find((s) => s.status === "done")
+    expect(doneStatus).toEqual({ status: "done", count: 1, isDone: true })
+  })
+
+  it("sorts non-terminal statuses before terminal statuses", () => {
+    const project = loadMultiStatusProject()
+    const summary = getStatusSummary(project)
+
+    const tasks = summary.find((s) => s.doctype === "task")!
+    const statusNames = tasks.statuses.map((s) => s.status)
+    // non-terminal alphabetically, then terminal alphabetically
+    expect(statusNames).toEqual(["in-progress", "new", "done"])
+  })
+
+  it("returns multiple statuses per doctype", () => {
+    const project = loadMultiStatusProject()
+    const summary = getStatusSummary(project)
+
+    const features = summary.find((s) => s.doctype === "feature")!
+    expect(features.active).toBe(2)
+    expect(features.done).toBe(0)
+    expect(features.statuses).toHaveLength(2)
+
+    const specs = summary.find((s) => s.doctype === "spec")!
+    expect(specs.active).toBe(1)
+    expect(specs.done).toBe(1)
   })
 })

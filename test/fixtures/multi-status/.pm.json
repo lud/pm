@@ -1,0 +1,5 @@
+{
+  "doctypes": {
+    "feature": { "dir": "context/features" }
+  }
+}
