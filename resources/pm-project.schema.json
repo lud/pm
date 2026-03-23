@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "doctypes": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string"
+          },
+          "dir": {
+            "type": "string"
+          },
+          "parent": {
+            "type": "string"
+          },
+          "requireParent": {
+            "default": true,
+            "type": "boolean"
+          },
+          "intermediateDir": {
+            "default": false,
+            "type": "boolean"
+          },
+          "doneStatuses": {
+            "default": [
+              "done"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultStatus": {
+            "default": "new",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag"
+        ]
+      }
+    }
+  }
+}

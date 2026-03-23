@@ -21,7 +21,7 @@ const DoctypeSchema = z.object({
 
 export type DoctypeConfig = z.infer<typeof DoctypeSchema>
 
-const ProjectConfigSchema = z.object({
+export const ProjectConfigSchema = z.object({
   $schema: z.string().optional(),
   doctypes: z.record(z.string(), DoctypeSchema).default({}),
 })

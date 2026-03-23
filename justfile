@@ -19,8 +19,7 @@ typecheck:
   npm run typecheck
 
 schema:
-  echo "TODO BUILD SCHEMA"
-  # npx tsx tools/build-json-schema.ts
+  npx tsx tools/build-json-schema.ts
 
 test:
   npm run test
