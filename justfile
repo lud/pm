@@ -25,7 +25,10 @@ schema:
 test:
   npm run test
 
+coverage:
+  npx vitest run --coverage
+
 _git_status:
   git status
 
-check: test schema typecheck format _git_status
+check: test coverage schema typecheck format _git_status
