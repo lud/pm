@@ -75,17 +75,20 @@ export function listDocuments(
     const isClosed = status !== undefined &&
       doc.doctype.closedStatuses.includes(status)
 
-    if (filter.open && isClosed) continue
-    if (filter.closed && !isClosed) continue
+    const showBoth = filter.open && filter.closed
+    if (!showBoth) {
+      if (filter.open && isClosed) continue
+      if (filter.closed && !isClosed) continue
 
-    // Default: show open only (when no status filter is specified)
-    if (
-      filter.status === undefined &&
-      !filter.open &&
-      !filter.closed &&
-      isClosed
-    ) {
-      continue
+      // Default: show open only (when no explicit status filter)
+      if (
+        filter.status === undefined &&
+        !filter.open &&
+        !filter.closed &&
+        isClosed
+      ) {
+        continue
+      }
     }
 
     results.push({

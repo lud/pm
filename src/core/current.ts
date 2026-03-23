@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, utimesSync } from "node:fs"
+import { readFileSync, writeFileSync, unlinkSync, utimesSync } from "node:fs"
 import { join } from "node:path"
 
 const CURRENT_FILE = ".pm.current"
@@ -25,6 +25,18 @@ export function getCurrentId(projectDir: string): number | null {
 export function setCurrentId(projectDir: string, id: number): void {
   const filePath = join(projectDir, CURRENT_FILE)
   writeFileSync(filePath, String(id) + "\n")
+}
+
+/**
+ * Clear the current document (remove `.pm.current`).
+ */
+export function clearCurrentId(projectDir: string): void {
+  const filePath = join(projectDir, CURRENT_FILE)
+  try {
+    unlinkSync(filePath)
+  } catch {
+    // File doesn't exist — that's fine
+  }
 }
 
 /**

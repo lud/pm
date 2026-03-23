@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { join, isAbsolute, dirname } from "node:path"
-import { existsSync, accessSync, constants } from "node:fs"
+import { accessSync, constants } from "node:fs"
 import { merge } from "lodash-es"
 import { readFileSyncOrAbort } from "./fs-helpers.js"
 import { abortError } from "./cli.js"
@@ -11,7 +11,7 @@ import { abortError } from "./cli.js"
 
 const DoctypeSchema = z.object({
   tag: z.string(),
-  dir: z.string().default("."),
+  dir: z.string().optional(),
   parent: z.string().optional(),
   requireParent: z.boolean().default(true),
   intermediateDir: z.boolean().default(false),
@@ -32,7 +32,7 @@ export type ProjectConfig = z.infer<typeof ProjectConfigSchema>
 // Default doctypes
 // ---------------------------------------------------------------------------
 
-const DEFAULT_DOCTYPES: Record<string, Partial<DoctypeConfig>> = {
+export const DEFAULT_DOCTYPES: Record<string, Partial<DoctypeConfig>> = {
   feature: {
     tag: "feat",
     intermediateDir: true,
@@ -56,7 +56,8 @@ const DEFAULT_DOCTYPES: Record<string, Partial<DoctypeConfig>> = {
 // Resolved project (absolute paths, validated)
 // ---------------------------------------------------------------------------
 
-export type ResolvedDoctype = DoctypeConfig & {
+export type ResolvedDoctype = Omit<DoctypeConfig, "dir"> & {
+  dir: string
   name: string
   absDir: string
 }
@@ -112,30 +113,26 @@ function validateDoctypes(
   const tags = new Set<string>()
 
   for (const [name, dt] of Object.entries(doctypes)) {
-    // Unique tags
     if (tags.has(dt.tag)) {
-      abortError(`Duplicate doctype tag "${dt.tag}" in doctype "${name}"`)
+      throw new Error(`Duplicate doctype tag "${dt.tag}" in doctype "${name}"`)
     }
     tags.add(dt.tag)
 
-    // Parent references existing doctype
     if (dt.parent !== undefined && !(dt.parent in doctypes)) {
-      abortError(
+      throw new Error(
         `Doctype "${name}" has parent "${dt.parent}" which does not exist`,
       )
     }
 
-    // Top-level doctypes must have an explicit dir
-    if (dt.parent === undefined && dt.dir === ".") {
-      // This is allowed per spec — user may want files in project root
+    if (dt.dir === undefined) {
+      throw new Error(`Doctype "${name}" is missing required field "dir"`)
     }
 
-    // No absolute paths or ..
     if (isAbsolute(dt.dir)) {
-      abortError(`Doctype "${name}" dir must be relative, got "${dt.dir}"`)
+      throw new Error(`Doctype "${name}" dir must be relative, got "${dt.dir}"`)
     }
     if (dt.dir.includes("..")) {
-      abortError(`Doctype "${name}" dir must not contain "..", got "${dt.dir}"`)
+      throw new Error(`Doctype "${name}" dir must not contain "..", got "${dt.dir}"`)
     }
   }
 
@@ -145,7 +142,7 @@ function validateDoctypes(
     let current: string | undefined = name
     while (current !== undefined) {
       if (visited.has(current)) {
-        abortError(`Circular parent reference detected involving doctype "${name}"`)
+        throw new Error(`Circular parent reference detected involving doctype "${name}"`)
       }
       visited.add(current)
       current = doctypes[current].parent
@@ -163,19 +160,25 @@ function validateDoctypes(
  */
 export function locateProjectFile(startDir: string): string {
   let dir = startDir
+  let lastError: string | null = null
   while (true) {
     const candidate = join(dir, ".pm.json")
     try {
       accessSync(candidate, constants.R_OK)
       return candidate
-    } catch {
-      // not found or not readable — keep walking
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === "EACCES") {
+        lastError = `permission denied: ${dir}`
+      }
+      // ENOENT is normal — keep walking
     }
 
     const parentDir = dirname(dir)
     if (parentDir === dir) {
       // Reached filesystem root
-      abortError("Could not locate .pm.json: not found")
+      const detail = lastError ?? "not found"
+      abortError(`Could not locate .pm.json: ${detail}`)
     }
     dir = parentDir
   }
@@ -183,6 +186,7 @@ export function locateProjectFile(startDir: string): string {
 
 /**
  * Load and resolve a project from a `.pm.json` file path.
+ * Aborts on any error (JSON parse, schema validation, etc.).
  */
 export function loadProjectFile(projectFile: string): ResolvedProject {
   const raw = readFileSyncOrAbort(projectFile, "utf-8")
@@ -193,7 +197,11 @@ export function loadProjectFile(projectFile: string): ResolvedProject {
     abortError(`Invalid JSON in ${projectFile}`)
   }
 
-  return resolveProject(parsed as Record<string, unknown>, projectFile)
+  try {
+    return resolveProject(parsed as Record<string, unknown>, projectFile)
+  } catch (err) {
+    abortError((err as Error).message)
+  }
 }
 
 /**
@@ -211,10 +219,19 @@ export function resolveProject(
   const mergedDoctypes = mergeWithDefaults(userDoctypes)
 
   // Parse through schema (strips $schema, applies defaults)
-  const config = ProjectConfigSchema.parse({
-    ...rawConfig,
-    doctypes: mergedDoctypes,
-  })
+  let config: ProjectConfig
+  try {
+    config = ProjectConfigSchema.parse({
+      ...rawConfig,
+      doctypes: mergedDoctypes,
+    })
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const issues = err.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`)
+      throw new Error(`Invalid project config in ${projectFile}:\n${issues.join("\n")}`)
+    }
+    throw err
+  }
 
   // Validate
   validateDoctypes(config.doctypes)
@@ -222,10 +239,12 @@ export function resolveProject(
   // Resolve to absolute paths
   const resolved: Record<string, ResolvedDoctype> = {}
   for (const [name, dt] of Object.entries(config.doctypes)) {
+    const dir = dt.dir ?? "."
     resolved[name] = {
       ...dt,
+      dir,
       name,
-      absDir: join(projectDir, dt.dir),
+      absDir: join(projectDir, dir),
     }
   }
 

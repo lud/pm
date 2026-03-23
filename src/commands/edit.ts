@@ -3,6 +3,7 @@ import { loadProjectFrom } from "../lib/project.js"
 import { editDocument } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
 import { formatPath } from "../lib/format.js"
+import { touchCurrent } from "../core/current.js"
 import * as cli from "../lib/cli.js"
 
 export const editCommand = command(
@@ -51,6 +52,7 @@ export const editCommand = command(
         setProperties: Object.keys(properties).length > 0 ? properties : undefined,
       })
 
+      touchCurrent(project.projectDir)
       const displayPath = formatPath(doc.path, process.cwd())
       cli.success(`Updated ${displayPath}`)
     } catch (err) {

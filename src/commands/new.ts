@@ -3,6 +3,7 @@ import { loadProjectFrom } from "../lib/project.js"
 import { createDocument } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
 import { formatPath } from "../lib/format.js"
+import { touchCurrent } from "../core/current.js"
 import * as cli from "../lib/cli.js"
 import { execSync } from "node:child_process"
 
@@ -48,6 +49,7 @@ export const newCommand = command(
         status: argv.flags.status ?? undefined,
       })
 
+      touchCurrent(project.projectDir)
       const displayPath = formatPath(result.path, process.cwd())
       cli.success(`Created ${displayPath}`)
 

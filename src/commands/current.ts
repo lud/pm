@@ -2,7 +2,7 @@ import { command } from "cleye"
 import { loadProjectFrom } from "../lib/project.js"
 import { showDocument } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
-import { getCurrentId, setCurrentId } from "../core/current.js"
+import { getCurrentId, setCurrentId, clearCurrentId, touchCurrent } from "../core/current.js"
 import { printShowResult } from "./show.js"
 import * as cli from "../lib/cli.js"
 
@@ -23,6 +23,7 @@ export const currentCommand = command(
         cli.abortError(`Invalid document ID: "${argv._.id}"`)
       }
       setCurrentId(project.projectDir, id)
+      touchCurrent(project.projectDir)
     } else {
       // Show current document
       id = getCurrentId(project.projectDir)
@@ -35,7 +36,7 @@ export const currentCommand = command(
     const result = showDocument(project, id)
     if (!result) {
       cli.warning(`Current document ${id} not found. Clearing.`)
-      // Don't clear here — user might want to investigate
+      clearCurrentId(project.projectDir)
       return
     }
 
