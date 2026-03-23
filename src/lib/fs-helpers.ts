@@ -3,6 +3,8 @@ import {
   readdirSync as _readdirSync,
   readFileSync as _readFileSync,
   writeFileSync as _writeFileSync,
+  renameSync as _renameSync,
+  rmdirSync as _rmdirSync,
 } from "node:fs"
 import type {
   Dirent,
@@ -87,5 +89,21 @@ export function writeFileSyncOrAbort(
     _writeFileSync(file, data, options)
   } catch (err) {
     abortError(formatFsError("write file", String(file), err))
+  }
+}
+
+export function renameSyncOrAbort(from: PathLike, to: PathLike): void {
+  try {
+    _renameSync(from, to)
+  } catch (err) {
+    abortError(formatFsError("rename", `${String(from)} → ${String(to)}`, err))
+  }
+}
+
+export function rmdirSyncOrAbort(path: PathLike): void {
+  try {
+    _rmdirSync(path)
+  } catch (err) {
+    abortError(formatFsError("remove directory", String(path), err))
   }
 }

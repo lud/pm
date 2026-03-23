@@ -110,13 +110,13 @@ pm which                   # Print path to .pm.json
 ```bash
 pm new feature User authentication           # Create a feature (title: "User authentication")
 pm new spec Login flow -p 001                # Create a spec under feature 001
-pm new task Add JWT middleware -p 002         # Create a task under spec 002
+pm new task Add JWT middleware -p 002        # Create a task under spec 002
 pm new feature Payment -s urgent             # Create with custom status
 pm new spec API design -p 001 -e             # Create and open in $EDITOR
 ```
 
-Title words are joined automatically — no quotes needed. The slug is derived from
-the title (lowercased, spaces become hyphens).
+Title words are joined automatically — no quotes needed. The slug is derived
+from the title (lowercased, spaces become hyphens).
 
 ### Updating documents
 
@@ -131,8 +131,6 @@ pm current 003                               # Set document 003 as current
 ### Maintenance
 
 ```bash
-pm tidy                    # Dry-run: show what would be fixed
-pm tidy -f                 # Apply fixes (duplicate IDs, relocations)
 pm init                    # Create .pm.json in current directory
 ```
 

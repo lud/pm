@@ -1,8 +1,11 @@
-import { readFileSync } from "node:fs"
-import { rename as renameAsync } from "node:fs/promises"
+import { readFileSync, readdirSync, rmdirSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { parseFrontmatter, prependFrontmatter } from "../lib/frontmatter.js"
-import { writeFileSyncOrAbort, mkdirSyncOrAbort } from "../lib/fs-helpers.js"
+import {
+  writeFileSyncOrAbort,
+  mkdirSyncOrAbort,
+  renameSyncOrAbort,
+} from "../lib/fs-helpers.js"
 import type { ResolvedProject, ResolvedDoctype } from "../lib/project.js"
 import {
   collectAllDocuments,
@@ -146,6 +149,7 @@ function computeAllExpectedPaths(
   project: ResolvedProject,
   docById: Map<number, DocumentEntry>,
   idRemapping: Map<string, number>,
+  orphanPaths: Set<string>,
 ): Map<string, string> {
   const result = new Map<string, string>()
 
@@ -153,6 +157,12 @@ function computeAllExpectedPaths(
   const sorted = topoSortByParent(docs, docById)
 
   for (const doc of sorted) {
+    // Orphans keep their current location — don't relocate them
+    if (orphanPaths.has(doc.path)) {
+      result.set(doc.path, doc.path)
+      continue
+    }
+
     const doctype = doc.doctype
     const newId = idRemapping.get(doc.path) ?? doc.id
     const filename = formatDocumentFilename(
@@ -173,7 +183,7 @@ function computeAllExpectedPaths(
         const parentExpectedPath = result.get(parentDoc.path) ?? parentDoc.path
         baseDir = dirname(parentExpectedPath)
       } else {
-        // Parent not found — orphan, keep current location
+        // Parent not found — keep current location
         result.set(doc.path, doc.path)
         continue
       }
@@ -234,7 +244,18 @@ function findOrphans(
   docs: DocumentEntry[],
   idSet: Set<number>,
 ): DocumentEntry[] {
-  return docs.filter((doc) => doc.parentId !== null && !idSet.has(doc.parentId))
+  return docs.filter((doc) => {
+    // Parent reference points to a non-existent document
+    if (doc.parentId !== null && !idSet.has(doc.parentId)) return true
+    // Doctype requires a parent but none is set
+    if (
+      doc.parentId === null &&
+      doc.doctype.parent !== undefined &&
+      doc.doctype.requireParent
+    )
+      return true
+    return false
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -337,11 +358,13 @@ export async function buildTidyPlan(
   }
 
   // Build mappings and detect relocations
+  const orphanPaths = new Set(orphans.map((o) => o.path))
   const expectedPaths = computeAllExpectedPaths(
     docs,
     project,
     docById,
     idRemapping,
+    orphanPaths,
   )
   const mappings: TidyMapping[] = []
   const moves: TidyMoveOp[] = []
@@ -392,7 +415,7 @@ export function applyTidyPlan(plan: TidyPlan): void {
   // 3. Move files: create target directory, rename file
   for (const move of plan.moves) {
     mkdirSyncOrAbort(dirname(move.to), { recursive: true })
-    _renameSync(move.from, move.to)
+    renameSyncOrAbort(move.from, move.to)
   }
 
   // 4. Clean up empty source directories (bottom-up by path length)
@@ -402,14 +425,53 @@ export function applyTidyPlan(plan: TidyPlan): void {
   }
 }
 
-function _renameSync(from: string, to: string): void {
-  const { renameSync } = require("node:fs") as typeof import("node:fs")
-  renameSync(from, to)
+/**
+ * Resolve a single orphan: set its parent in frontmatter and relocate it.
+ */
+export function resolveOrphan(
+  project: ResolvedProject,
+  orphan: DocumentEntry,
+  parent: DocumentEntry,
+): void {
+  // 1. Write parent ref to frontmatter
+  const parentRef = formatParentRef(parent.id, parent.tag, parent.slug)
+  const content = readFileSync(orphan.path, "utf-8")
+  const { data, body } = parseFrontmatter(content)
+  data.parent = parentRef
+  const newContent = prependFrontmatter(data, body)
+  writeFileSyncOrAbort(orphan.path, newContent)
+
+  // 2. Compute expected path
+  const parentSelfDir = dirname(parent.path)
+  const doctype = orphan.doctype
+  const targetDir =
+    doctype.dir === "." ? parentSelfDir : join(parentSelfDir, doctype.dir)
+  const filename = formatDocumentFilename(
+    orphan.id,
+    orphan.tag,
+    orphan.slug,
+    project.idPadWidth,
+  )
+
+  let expectedPath: string
+  if (doctype.intermediateDir) {
+    const dirName = filename.replace(/\.md$/, "")
+    expectedPath = join(targetDir, dirName, filename)
+  } else {
+    expectedPath = join(targetDir, filename)
+  }
+
+  // 3. Relocate if path differs
+  if (expectedPath !== orphan.path) {
+    mkdirSyncOrAbort(dirname(expectedPath), { recursive: true })
+    renameSyncOrAbort(orphan.path, expectedPath)
+
+    // Clean up empty source directory
+    tryRemoveEmptyDir(dirname(orphan.path))
+  }
 }
 
 function tryRemoveEmptyDir(dir: string): void {
-  const { readdirSync, rmdirSync } =
-    require("node:fs") as typeof import("node:fs")
   try {
     const entries = readdirSync(dir)
     if (entries.length === 0) {

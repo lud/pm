@@ -222,6 +222,67 @@ describe("buildTidyPlan with duplicates", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildTidyPlan with orphans", () => {
+  it("detects documents with required parent missing from frontmatter", async () => {
+    const dir = workspace.dir("missing-parent-fixture")
+    const { mkdirSync, writeFileSync } = require("node:fs")
+    const featDir = join(dir, "context", "features", "001.feat.test")
+    mkdirSync(featDir, { recursive: true })
+    writeFileSync(
+      join(dir, ".pm.json"),
+      JSON.stringify({
+        doctypes: { feature: { dir: "context/features" } },
+      }),
+    )
+    writeFileSync(
+      join(featDir, "001.feat.test.md"),
+      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
+    )
+    // Spec with no parent field at all — but spec requires a parent
+    writeFileSync(
+      join(featDir, "002.spec.no-parent.md"),
+      ["---", "title: Spec without parent", "status: new", "---", ""].join(
+        "\n",
+      ),
+    )
+
+    const project = reloadProject(dir)
+    const plan = await buildTidyPlan(project)
+    expect(plan.orphans).toHaveLength(1)
+    expect(plan.orphans[0].slug).toBe("no-parent")
+  })
+
+  it("does not relocate orphaned documents", async () => {
+    const dir = workspace.dir("orphan-no-relocate")
+    const { mkdirSync, writeFileSync } = require("node:fs")
+    const featDir = join(dir, "context", "features", "001.feat.test")
+    mkdirSync(featDir, { recursive: true })
+    writeFileSync(
+      join(dir, ".pm.json"),
+      JSON.stringify({
+        doctypes: { feature: { dir: "context/features" } },
+      }),
+    )
+    writeFileSync(
+      join(featDir, "001.feat.test.md"),
+      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
+    )
+    // Spec without parent — sits in the feature directory
+    writeFileSync(
+      join(featDir, "002.spec.no-parent.md"),
+      ["---", "title: Spec without parent", "status: new", "---", ""].join(
+        "\n",
+      ),
+    )
+
+    const project = reloadProject(dir)
+    const plan = await buildTidyPlan(project)
+
+    // Should be an orphan
+    expect(plan.orphans).toHaveLength(1)
+    // Should NOT be relocated to project root
+    expect(plan.moves).toHaveLength(0)
+  })
+
   it("detects documents whose parent does not exist", async () => {
     const dir = workspace.dir("orphan-fixture")
     const { mkdirSync, writeFileSync } = require("node:fs")

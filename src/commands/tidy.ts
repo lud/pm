@@ -5,9 +5,13 @@ import { formatPath } from "../lib/format.js"
 import {
   buildTidyPlan,
   applyTidyPlan,
+  resolveOrphan,
   type DocumentEntry,
   type TidyPlan,
 } from "../core/tidy.js"
+import { collectAllDocuments } from "../core/scanner.js"
+import { readFileSync } from "node:fs"
+import { parseFrontmatter } from "../lib/frontmatter.js"
 import * as cli from "../lib/cli.js"
 
 export const tidyCommand = command(
@@ -50,11 +54,13 @@ export const tidyCommand = command(
 
     // Report orphans
     if (plan.orphans.length > 0) {
-      cli.warning("Orphaned documents (parent not found):")
+      cli.warning(
+        "Orphaned documents (parent required but not set or not found):",
+      )
       for (const doc of plan.orphans) {
-        cli.info(
-          `  ${formatPath(doc.path, cwd)} (parent: ${doc.frontmatter.parent})`,
-        )
+        const parentRef = doc.frontmatter.parent ?? "(none)"
+        cli.info(`  ${formatPath(doc.path, cwd)} (parent: ${parentRef})`)
+        cli.info(`    → will prompt for parent and relocate when applied`)
       }
       cli.info("")
     }
@@ -83,13 +89,70 @@ export const tidyCommand = command(
 
     if (!argv.flags.force) {
       cli.info("Dry run. Use -f to apply changes.")
-    } else {
-      applyTidyPlan(plan)
-      cli.success("Tidy complete.")
+      return
     }
-    return
+
+    // Apply edits and moves from the plan
+    applyTidyPlan(plan)
+
+    // Resolve orphans interactively
+    if (plan.orphans.length > 0) {
+      // Build candidate list: all documents of the expected parent doctype
+      for (const orphan of plan.orphans) {
+        const expectedParentDoctype = orphan.doctype.parent
+        if (!expectedParentDoctype) continue
+
+        // Re-scan to get current state (previous moves may have changed paths)
+        const freshProject = loadProjectFrom(process.cwd())
+        const allDocs = collectAllDocuments(freshProject)
+        const candidates = allDocs
+          .filter((d) => d.doctype.name === expectedParentDoctype)
+          .map((d) => {
+            const content = readFileSync(d.path, "utf-8")
+            const { data, body } = parseFrontmatter(content)
+            return {
+              ...d,
+              frontmatter: data,
+              body,
+              parentId: null,
+            } as DocumentEntry
+          })
+
+        if (candidates.length === 0) {
+          cli.warning(
+            `No ${expectedParentDoctype} documents found to be parent of ${orphan.slug}. Skipping.`,
+          )
+          continue
+        }
+
+        const selected = await promptForOrphanParent(orphan, candidates)
+        if (selected) {
+          resolveOrphan(freshProject, orphan, selected)
+          cli.success(
+            `  ${formatPath(orphan.path, cwd)} → parent: ${selected.tag} ${selected.id} ${selected.slug}`,
+          )
+        } else {
+          cli.warning(`  Skipped ${orphan.slug}`)
+        }
+      }
+    }
+
+    cli.success("Tidy complete.")
   },
 )
+
+async function promptForOrphanParent(
+  orphan: DocumentEntry,
+  candidates: DocumentEntry[],
+): Promise<DocumentEntry | null> {
+  cli.info("")
+  cli.warning(
+    `Orphan "${orphan.frontmatter.title ?? orphan.slug}" (${orphan.tag} ${orphan.id}) needs a parent.`,
+  )
+  cli.info(`  Path: ${orphan.path}`)
+
+  return promptSelectDocument("Select parent document:", candidates)
+}
 
 async function promptForParent(
   doc: DocumentEntry,
@@ -99,16 +162,22 @@ async function promptForParent(
   cli.warning(
     `Document "${doc.frontmatter.title ?? doc.slug}" (${doc.tag} ${doc.id}) has ambiguous parent.`,
   )
-  cli.info("Select the correct parent:")
 
+  return promptSelectDocument("Select correct parent:", candidates)
+}
+
+async function promptSelectDocument(
+  message: string,
+  candidates: DocumentEntry[],
+): Promise<DocumentEntry | null> {
   const choices = candidates.map((c) => ({
-    name: `${c.tag} ${String(c.id).padStart(3, "0")} ${c.frontmatter.title ?? c.slug} — ${c.path}`,
+    name: `${c.tag} ${String(c.id).padStart(3, "0")} ${c.frontmatter.title ?? c.slug}`,
     value: c.path,
   }))
 
   try {
     const selectedPath = await search({
-      message: "Parent document:",
+      message,
       source: (input) => {
         if (!input) return choices
         const lower = input.toLowerCase()
@@ -118,7 +187,6 @@ async function promptForParent(
 
     return candidates.find((c) => c.path === selectedPath) ?? null
   } catch {
-    // User cancelled
     return null
   }
 }
