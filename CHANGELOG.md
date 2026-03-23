@@ -1,11 +1,16 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
 
-### Bug Fixes
+## [0.2.1] - 2026-03-23
 
-- Fixed directory naming in tidy command
+### ⚙️ Miscellaneous Tasks
 
-### Features
+- Git cliff configuration
+
+## [0.2.0] - 2026-03-23
+
+### 🚀 Features
 
 - Base standard features
 - Rename open/closed to active/done
@@ -16,13 +21,17 @@
 - Added example skill for guidelines
 - Accept variadic arguments to name a new document
 
-### Miscellaneous
+### 🐛 Bug Fixes
+
+- Fixed directory naming in tidy command
+
+### 🧪 Testing
+
+- Initialize test suite
+
+### ⚙️ Miscellaneous Tasks
 
 - Use coverage in check command
 - Iterations on file relationships
 - Added release script
-
-### Testing
-
-- Initialize test suite
 
