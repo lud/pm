@@ -4,6 +4,10 @@ PM is a file-based project management CLI tool for software developers. It organ
 
 This repository is the source code for the `pm` CLI. The `skills/` directory contains Claude Code skills that teach agents how to use the tool — notably `skills/pm-guide.md` which describes the commands and workflow. This project can itself be managed with `pm`.
 
+## Skills
+
+Skills are created and edited frequently in this project. When creating a new skill, always ask the user whether it should go in the project `skills/` directory (shared, checked into the repo) or in the user's config directory (`$CLAUDE_CONFIG_DIR/skills/`, personal).
+
 ## Project structure
 
 ```
