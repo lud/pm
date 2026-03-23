@@ -2,6 +2,8 @@
 
 PM is a file-based project management CLI tool for software developers. It organizes documentation files (features, specs, tasks, etc.) into a configurable hierarchy, with metadata (frontmatter) as the source of truth.
 
+This repository is the source code for the `pm` CLI. The `skills/` directory contains Claude Code skills that teach agents how to use the tool — notably `skills/pm-guide.md` which describes the commands and workflow. This project can itself be managed with `pm`.
+
 ## Project structure
 
 ```
