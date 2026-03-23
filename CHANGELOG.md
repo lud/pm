@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-23
+
+### ⚙️ Miscellaneous Tasks
+
+- Added npm publication tooling
+- Renamed package
+
 ## [0.2.1] - 2026-03-23
 
 ### ⚙️ Miscellaneous Tasks
