@@ -1,14 +1,18 @@
 {
-  "name": "software-project-manager",
+  "name": "@lud/pm",
   "version": "0.2.1",
   "type": "module",
   "bin": {
     "pm": "dist/main.js"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
-    "build": "bun build src/main.ts --compile --outfile dist/pm",
+    "build": "tsc && node tools/add-shebang.cjs dist/main.js",
+    "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest"
   },

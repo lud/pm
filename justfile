@@ -1,16 +1,13 @@
 default: test
 
 install: build schema
-  cp dist/pm ~/.local/bin/pm
+  ln -sf "$(pwd)/dist/main.js" ~/.local/bin/pm
 
 uninstall:
   rm -f ~/.local/bin/pm
 
 build:
   npm run build
-
-upgrade-bun:
-  bun upgrade
 
 format:
   prettier --write '**/*.{ts,tsx}'
