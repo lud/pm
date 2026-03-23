@@ -318,6 +318,112 @@ describe("buildTidyPlan with orphans", () => {
 })
 
 // ---------------------------------------------------------------------------
+// Bare numeric parent refs
+// ---------------------------------------------------------------------------
+
+describe("buildTidyPlan with bare numeric parent refs", () => {
+  it("expands a numeric parent to a full reference", async () => {
+    const dir = workspace.dir("bare-parent-fixture")
+    const { mkdirSync, writeFileSync } = require("node:fs")
+    const featDir = join(dir, "context", "features", "001.feat.test")
+    mkdirSync(featDir, { recursive: true })
+    writeFileSync(
+      join(dir, ".pm.json"),
+      JSON.stringify({
+        doctypes: { feature: { dir: "context/features" } },
+      }),
+    )
+    writeFileSync(
+      join(featDir, "001.feat.test.md"),
+      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
+    )
+    // Spec with bare numeric parent
+    writeFileSync(
+      join(featDir, "002.spec.login.md"),
+      ["---", "parent: 1", "title: Login spec", "status: new", "---", ""].join(
+        "\n",
+      ),
+    )
+
+    const project = reloadProject(dir)
+    const plan = await buildTidyPlan(project)
+
+    expect(plan.edits).toHaveLength(1)
+    expect(plan.edits[0].newParentRef).toBe("1.feat.test")
+  })
+
+  it("does not edit a parent ref that is already a full reference", async () => {
+    const dir = workspace.dir("full-parent-fixture")
+    const { mkdirSync, writeFileSync } = require("node:fs")
+    const featDir = join(dir, "context", "features", "001.feat.test")
+    mkdirSync(featDir, { recursive: true })
+    writeFileSync(
+      join(dir, ".pm.json"),
+      JSON.stringify({
+        doctypes: { feature: { dir: "context/features" } },
+      }),
+    )
+    writeFileSync(
+      join(featDir, "001.feat.test.md"),
+      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
+    )
+    writeFileSync(
+      join(featDir, "002.spec.login.md"),
+      [
+        "---",
+        "parent: 1.feat.test",
+        "title: Login spec",
+        "status: new",
+        "---",
+        "",
+      ].join("\n"),
+    )
+
+    const project = reloadProject(dir)
+    const plan = await buildTidyPlan(project)
+
+    expect(plan.edits).toHaveLength(0)
+  })
+
+  it("applies bare parent fix end-to-end", async () => {
+    const dir = workspace.dir("bare-parent-apply")
+    const { mkdirSync, writeFileSync } = require("node:fs")
+    const featDir = join(dir, "context", "features", "001.feat.test")
+    mkdirSync(featDir, { recursive: true })
+    writeFileSync(
+      join(dir, ".pm.json"),
+      JSON.stringify({
+        doctypes: { feature: { dir: "context/features" } },
+      }),
+    )
+    writeFileSync(
+      join(featDir, "001.feat.test.md"),
+      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
+    )
+    writeFileSync(
+      join(featDir, "002.spec.login.md"),
+      ["---", "parent: 1", "title: Login spec", "status: new", "---", ""].join(
+        "\n",
+      ),
+    )
+
+    const project = reloadProject(dir)
+    const plan = await buildTidyPlan(project)
+    applyTidyPlan(plan)
+
+    // Verify the file was updated
+    const content = readFileSync(join(featDir, "002.spec.login.md"), "utf-8")
+    const { data } = parseFrontmatter(content)
+    expect(data.parent).toBe("1.feat.test")
+
+    // Verify idempotent
+    const project2 = reloadProject(dir)
+    const plan2 = await buildTidyPlan(project2)
+    expect(plan2.edits).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Prompt for parent (ambiguous duplicate)
 // ---------------------------------------------------------------------------
 

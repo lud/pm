@@ -340,7 +340,8 @@ export async function buildTidyPlan(
     }
   }
 
-  // Also update parent refs for documents whose parent got a new ID
+  // Also update parent refs for documents whose parent got a new ID,
+  // or whose parent ref is a bare number instead of a full reference.
   for (const doc of docs) {
     if (doc.parentId === null) continue
     // Skip documents already handled above (children of duplicates)
@@ -353,6 +354,10 @@ export async function buildTidyPlan(
     if (parentNewId !== undefined) {
       // Parent's ID changed — update the child's parent ref
       const newRef = formatParentRef(parentNewId, parent.tag, parent.slug)
+      edits.push({ path: doc.path, newParentRef: newRef })
+    } else if (typeof doc.frontmatter.parent === "number") {
+      // Bare numeric parent — expand to full reference
+      const newRef = formatParentRef(parent.id, parent.tag, parent.slug)
       edits.push({ path: doc.path, newParentRef: newRef })
     }
   }
