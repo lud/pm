@@ -33,7 +33,7 @@ export const currentCommand = command(
       // Show current document
       id = getCurrentId(project.projectDir)
       if (id === null) {
-        cli.info("No current document set. Use: pm current <id>")
+        cli.info("No current document set.\nUse: `pm current <id>` to set a current document.")
         return
       }
     }
