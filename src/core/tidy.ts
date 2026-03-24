@@ -6,7 +6,7 @@ import {
   renameSyncOrAbort,
   writeFileSyncOrAbort,
 } from "../lib/fs-helpers.js"
-import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
+import type { ResolvedProject } from "../lib/project.js"
 import {
   extractParentId,
   formatParentRef,

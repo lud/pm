@@ -27,7 +27,7 @@ function resolve(
   return resolveProject(rawConfig, `${projectDir}/.pm.json`)
 }
 
-const FULL_DOCTYPES = {
+const _FULL_DOCTYPES = {
   feature: { tag: "feat", dir: "context/features", intermediateDir: true },
   spec: { tag: "spec", dir: ".", parent: "feature" },
   task: { tag: "task", dir: ".", parent: "spec" },
@@ -210,7 +210,7 @@ describe("locateProjectFile", () => {
 
   it("aborts when .pm.json is not found", () => {
     expect(() =>
-      locateProjectFile("/tmp/pm-test-nonexistent-" + Date.now()),
+      locateProjectFile(`/tmp/pm-test-nonexistent-${Date.now()}`),
     ).toThrow(/Could not locate .pm.json/)
   })
 })

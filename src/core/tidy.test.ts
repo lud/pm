@@ -431,7 +431,7 @@ describe("buildTidyPlan with ambiguous duplicate parent", () => {
 
     let promptCalled = false
     const mockPrompt = async (
-      doc: DocumentEntry,
+      _doc: DocumentEntry,
       candidates: DocumentEntry[],
     ): Promise<DocumentEntry | null> => {
       promptCalled = true

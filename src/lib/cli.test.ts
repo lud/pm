@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 // Capture stdout writes
 let output: string[]
-const originalWrite = process.stdout.write
+const _originalWrite = process.stdout.write
 
 beforeEach(() => {
   output = []

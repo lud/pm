@@ -95,7 +95,7 @@ export const initCommand = command(
       }
     }
 
-    writeFileSync(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + "\n")
+    writeFileSync(configPath, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`)
     cli.success("Created .pm.json")
 
     ensureGitignore(cwd)

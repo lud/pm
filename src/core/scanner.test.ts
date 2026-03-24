@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest"
-import { resolveProject } from "../lib/project.js"
 import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 import {
   collectAllDocuments,
@@ -8,7 +7,6 @@ import {
   getNextId,
   parseDocumentFilename,
   parseDocumentRef,
-  scanDocuments,
 } from "./scanner.js"
 
 // ---------------------------------------------------------------------------

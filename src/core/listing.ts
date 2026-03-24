@@ -78,10 +78,7 @@ function classifyStatus(
   return "active"
 }
 
-function buildPredicates(
-  project: ResolvedProject,
-  options: ListOptions,
-): Predicate[] {
+function buildPredicates(options: ListOptions): Predicate[] {
   const predicates: Predicate[] = []
 
   if (options.doctype !== undefined) {
@@ -142,7 +139,7 @@ export function listDocuments(
   project: ResolvedProject,
   options: ListOptions = {},
 ): ListEntry[] {
-  const predicates = buildPredicates(project, options)
+  const predicates = buildPredicates(options)
   const needsFrontmatter = predicates.some((p) => p.requiresFrontmatter)
   const filterFn = (r: ReaderResult) => predicates.every((p) => p.filter(r))
 

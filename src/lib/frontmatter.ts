@@ -18,7 +18,7 @@ export function hasFrontmatter(content: string): boolean {
 }
 
 export function formatFrontmatter(data: Record<string, unknown>): string {
-  return "---\n" + yaml.stringify(data).trimEnd() + "\n---\n"
+  return `---\n${yaml.stringify(data).trimEnd()}\n---\n`
 }
 
 export function prependFrontmatter(

@@ -9,6 +9,13 @@
       "semicolons": "asNeeded"
     }
   },
+  "linter": {
+    "rules": {
+      "style": {
+        "noNonNullAssertion": "off"
+      }
+    }
+  },
   "files": {
     "includes": ["**/src/**/*.ts", "**/tools/**/*.ts"]
   }

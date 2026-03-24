@@ -67,7 +67,7 @@ if (status) {
 
 // 1. Bump version in package.json
 pkg.version = newVersion
-writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n")
+writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`)
 console.log(`Updated package.json`)
 
 // 2. Generate changelog with git-cliff

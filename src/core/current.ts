@@ -13,7 +13,7 @@ export function getCurrentId(projectDir: string): number | null {
     const content = readFileSync(filePath, "utf-8").trim()
     if (!content) return null
     const id = parseInt(content, 10)
-    return isNaN(id) || id <= 0 ? null : id
+    return Number.isNaN(id) || id <= 0 ? null : id
   } catch {
     return null
   }
@@ -24,7 +24,7 @@ export function getCurrentId(projectDir: string): number | null {
  */
 export function setCurrentId(projectDir: string, id: number): void {
   const filePath = join(projectDir, CURRENT_FILE)
-  writeFileSync(filePath, String(id) + "\n")
+  writeFileSync(filePath, `${String(id)}\n`)
 }
 
 /**

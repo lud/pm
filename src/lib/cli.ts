@@ -5,7 +5,7 @@ export function write(text: string): void {
 }
 
 export function writeln(text: string): void {
-  process.stdout.write(text + "\n")
+  process.stdout.write(`${text}\n`)
 }
 
 export function info(text: string): void {

@@ -7,7 +7,6 @@ import {
   buildTidyPlan,
   type DocumentEntry,
   resolveOrphan,
-  type TidyPlan,
 } from "../core/tidy.js"
 import * as cli from "../lib/cli.js"
 import { formatPath } from "../lib/format.js"

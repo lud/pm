@@ -1,7 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { resolveProject } from "../lib/project.js"
 import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 import { getStatusSummary, listDocuments } from "./listing.js"
 
