@@ -10,7 +10,7 @@ build:
   npm run build
 
 format:
-  prettier --write '**/*.{ts,tsx}'
+  biome check --fix
 
 typecheck:
   npm run typecheck

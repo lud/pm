@@ -1,22 +1,22 @@
-import { readFileSync, readdirSync, rmdirSync } from "node:fs"
-import { join, dirname } from "node:path"
+import { readdirSync, readFileSync, rmdirSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { parseFrontmatter, prependFrontmatter } from "../lib/frontmatter.js"
 import {
-  writeFileSyncOrAbort,
   mkdirSyncOrAbort,
   renameSyncOrAbort,
+  writeFileSyncOrAbort,
 } from "../lib/fs-helpers.js"
-import type { ResolvedProject, ResolvedDoctype } from "../lib/project.js"
+import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
+import {
+  extractParentId,
+  formatParentRef,
+  parseParentRef,
+} from "./parent-ref.js"
 import {
   collectAllDocuments,
   formatDocumentFilename,
   type ScannedDocument,
 } from "./scanner.js"
-import {
-  formatParentRef,
-  extractParentId,
-  parseParentRef,
-} from "./parent-ref.js"
 
 // ---------------------------------------------------------------------------
 // Types

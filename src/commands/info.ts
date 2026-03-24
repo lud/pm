@@ -1,7 +1,7 @@
 import { command } from "cleye"
-import { loadProjectFrom } from "../lib/project.js"
 import { getProjectInfo } from "../core/info.js"
 import * as cli from "../lib/cli.js"
+import { loadProjectFrom } from "../lib/project.js"
 
 export const infoCommand = command(
   {

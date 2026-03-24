@@ -1,12 +1,12 @@
 import { command } from "cleye"
 import table from "text-table"
-import { loadProjectFrom } from "../lib/project.js"
-import { getStatusSummary, type StatusSummary } from "../core/listing.js"
-import { showDocument } from "../core/documents.js"
 import { getCurrentId } from "../core/current.js"
-import { formatDocumentHeader, formatParentsList } from "./show.js"
-import type { ResolvedProject } from "../lib/project.js"
+import { showDocument } from "../core/documents.js"
+import { getStatusSummary, type StatusSummary } from "../core/listing.js"
 import * as cli from "../lib/cli.js"
+import type { ResolvedProject } from "../lib/project.js"
+import { loadProjectFrom } from "../lib/project.js"
+import { formatDocumentHeader, formatParentsList } from "./show.js"
 
 function formatStatusMarker(s: {
   status: string

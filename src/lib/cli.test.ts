@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 // Capture stdout writes
 let output: string[]
@@ -12,7 +12,7 @@ beforeEach(() => {
   })
 })
 
-import { write, writeln, info, warning, error, debug, success } from "./cli.js"
+import { debug, error, info, success, warning, write, writeln } from "./cli.js"
 
 describe("output functions", () => {
   it("write outputs without newline", () => {

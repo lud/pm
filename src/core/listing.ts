@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs"
 import { parseFrontmatter } from "../lib/frontmatter.js"
-import type { ResolvedProject, ResolvedDoctype } from "../lib/project.js"
+import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
 import type { PropertyFilter } from "../lib/properties.js"
+import { extractParentId } from "./parent-ref.js"
 import {
-  scanDocuments,
   collectAllDocuments,
   type ScannedDocument,
+  scanDocuments,
 } from "./scanner.js"
-import { extractParentId } from "./parent-ref.js"
 
 // ---------------------------------------------------------------------------
 // Types

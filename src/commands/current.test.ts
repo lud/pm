@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, afterEach } from "vitest"
-import { join } from "node:path"
 import { writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { cli } from "cleye"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { createTestProject } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {

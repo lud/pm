@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs"
-import { join, dirname } from "node:path"
+import { dirname, join } from "node:path"
 import { formatFrontmatter } from "./frontmatter.js"
-import { resolveProject, type ResolvedProject } from "./project.js"
+import { type ResolvedProject, resolveProject } from "./project.js"
 import { createTestWorkspace } from "./test-workspace.js"
 
 export type TestSetup = {

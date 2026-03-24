@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, afterEach } from "vitest"
-import { join } from "node:path"
 import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { cli } from "cleye"
-import { createTestProject } from "../lib/test-setup.js"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { parseFrontmatter } from "../lib/frontmatter.js"
+import { createTestProject } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {
   const actual = (await vi.importActual("../lib/cli.js")) as Record<

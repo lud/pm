@@ -1,4 +1,5 @@
 #!/usr/bin/env npx tsx
+
 /**
  * Release script: bump version, generate changelog, commit and tag.
  *
@@ -9,8 +10,8 @@
  *   npx tsx tools/release.ts 1.2.3    # explicit version
  */
 
-import { readFileSync, writeFileSync } from "node:fs"
 import { execSync } from "node:child_process"
+import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 const rootDir = join(import.meta.dirname, "..")

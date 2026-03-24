@@ -1,18 +1,18 @@
-import { command } from "cleye"
+import { readFileSync } from "node:fs"
 import { search } from "@inquirer/prompts"
-import { loadProjectFrom } from "../lib/project.js"
-import { formatPath } from "../lib/format.js"
+import { command } from "cleye"
+import { collectAllDocuments } from "../core/scanner.js"
 import {
-  buildTidyPlan,
   applyTidyPlan,
-  resolveOrphan,
+  buildTidyPlan,
   type DocumentEntry,
+  resolveOrphan,
   type TidyPlan,
 } from "../core/tidy.js"
-import { collectAllDocuments } from "../core/scanner.js"
-import { readFileSync } from "node:fs"
-import { parseFrontmatter } from "../lib/frontmatter.js"
 import * as cli from "../lib/cli.js"
+import { formatPath } from "../lib/format.js"
+import { parseFrontmatter } from "../lib/frontmatter.js"
+import { loadProjectFrom } from "../lib/project.js"
 
 export const tidyCommand = command(
   {

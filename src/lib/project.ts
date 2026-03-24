@@ -1,8 +1,8 @@
-import { z } from "zod"
-import { join, isAbsolute, dirname } from "node:path"
 import { accessSync, constants } from "node:fs"
-import { readFileSyncOrAbort } from "./fs-helpers.js"
+import { dirname, isAbsolute, join } from "node:path"
+import { z } from "zod"
 import { abortError } from "./cli.js"
+import { readFileSyncOrAbort } from "./fs-helpers.js"
 
 // ---------------------------------------------------------------------------
 // Schema

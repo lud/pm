@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest"
+import { describe, expect, it } from "vitest"
 import {
+  extractParentId,
   formatParentRef,
   parseParentRef,
-  extractParentId,
 } from "./parent-ref.js"
 
 describe("formatParentRef", () => {

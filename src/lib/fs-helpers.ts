@@ -1,11 +1,3 @@
-import {
-  mkdirSync as _mkdirSync,
-  readdirSync as _readdirSync,
-  readFileSync as _readFileSync,
-  writeFileSync as _writeFileSync,
-  renameSync as _renameSync,
-  rmdirSync as _rmdirSync,
-} from "node:fs"
 import type {
   Dirent,
   MakeDirectoryOptions,
@@ -13,6 +5,14 @@ import type {
   PathLike,
   PathOrFileDescriptor,
   WriteFileOptions,
+} from "node:fs"
+import {
+  mkdirSync as _mkdirSync,
+  readdirSync as _readdirSync,
+  readFileSync as _readFileSync,
+  renameSync as _renameSync,
+  rmdirSync as _rmdirSync,
+  writeFileSync as _writeFileSync,
 } from "node:fs"
 import { abortError } from "./cli.js"
 

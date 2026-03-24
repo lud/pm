@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest"
 import { join } from "node:path"
+import { describe, expect, it } from "vitest"
 import { resolveProject } from "../lib/project.js"
 import { getProjectInfo } from "./info.js"
 

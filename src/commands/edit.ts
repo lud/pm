@@ -1,10 +1,10 @@
 import { command } from "cleye"
-import { loadProjectFrom } from "../lib/project.js"
+import { touchCurrent } from "../core/current.js"
 import { editDocument } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
-import { formatPath } from "../lib/format.js"
-import { touchCurrent } from "../core/current.js"
 import * as cli from "../lib/cli.js"
+import { formatPath } from "../lib/format.js"
+import { loadProjectFrom } from "../lib/project.js"
 import { parsePropertyFlags } from "../lib/properties.js"
 
 export const editCommand = command(
@@ -45,7 +45,7 @@ export const editCommand = command(
         cli.abortError(`Invalid parent ID: "${argv.flags.parent}"`)
       }
 
-      if (Object.prototype.hasOwnProperty.call(properties, "parent")) {
+      if (Object.hasOwn(properties, "parent")) {
         cli.abortError(
           'Cannot combine --parent with --set parent:... on "edit"',
         )

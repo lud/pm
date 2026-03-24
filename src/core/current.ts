@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, unlinkSync, utimesSync } from "node:fs"
+import { readFileSync, unlinkSync, utimesSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 const CURRENT_FILE = ".pm.current"

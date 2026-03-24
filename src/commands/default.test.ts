@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest"
 import { join } from "node:path"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { createTestProject } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {
@@ -38,7 +38,7 @@ vi.mock("../lib/project.js", async () => {
 })
 
 import * as cliMod from "../lib/cli.js"
-import { tryLocateProjectFile, loadProjectFile } from "../lib/project.js"
+import { loadProjectFile, tryLocateProjectFile } from "../lib/project.js"
 import { runDefaultCommand } from "./default.js"
 
 const testProject = createTestProject("default-cmd")

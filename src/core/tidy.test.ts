@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest"
-import { join } from "node:path"
 import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { describe, expect, it, vi } from "vitest"
 
 vi.mock("../lib/cli.js", async () => {
   const actual = (await vi.importActual("../lib/cli.js")) as Record<
@@ -15,11 +15,11 @@ vi.mock("../lib/cli.js", async () => {
   }
 })
 
-import { loadProjectFile } from "../lib/project.js"
 import { parseFrontmatter } from "../lib/frontmatter.js"
+import { loadProjectFile } from "../lib/project.js"
 import { createTestProject } from "../lib/test-setup.js"
-import { buildTidyPlan, applyTidyPlan, type DocumentEntry } from "./tidy.js"
 import { collectAllDocuments } from "./scanner.js"
+import { applyTidyPlan, buildTidyPlan, type DocumentEntry } from "./tidy.js"
 
 const BASIC_DOCTYPES = {
   feature: { tag: "feat", dir: "context/features", intermediateDir: true },

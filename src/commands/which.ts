@@ -1,7 +1,7 @@
 import { command } from "cleye"
-import { loadProjectFrom } from "../lib/project.js"
-import { formatPath } from "../lib/format.js"
 import * as cli from "../lib/cli.js"
+import { formatPath } from "../lib/format.js"
+import { loadProjectFrom } from "../lib/project.js"
 
 export const whichCommand = command(
   {

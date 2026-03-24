@@ -1,15 +1,15 @@
-import { describe, it, expect } from "vitest"
-import {
-  parseDocumentFilename,
-  formatDocumentFilename,
-  parseDocumentRef,
-  scanDocuments,
-  findDocumentById,
-  collectAllDocuments,
-  getNextId,
-} from "./scanner.js"
+import { describe, expect, it } from "vitest"
 import { resolveProject } from "../lib/project.js"
 import { createTestProject, type TestSetup } from "../lib/test-setup.js"
+import {
+  collectAllDocuments,
+  findDocumentById,
+  formatDocumentFilename,
+  getNextId,
+  parseDocumentFilename,
+  parseDocumentRef,
+  scanDocuments,
+} from "./scanner.js"
 
 // ---------------------------------------------------------------------------
 // Filename parsing

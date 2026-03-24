@@ -1,10 +1,10 @@
 import { command } from "cleye"
-import { loadProjectFrom } from "../lib/project.js"
-import { showDocument, type ShowResult } from "../core/documents.js"
 import type { DocumentInfo } from "../core/documents.js"
+import { type ShowResult, showDocument } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
-import { formatPath } from "../lib/format.js"
 import * as cli from "../lib/cli.js"
+import { formatPath } from "../lib/format.js"
+import { loadProjectFrom } from "../lib/project.js"
 
 export const showCommand = command(
   {

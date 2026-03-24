@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { cli } from "cleye"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createTestProject, dedent } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {

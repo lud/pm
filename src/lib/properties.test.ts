@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest"
+import { describe, expect, it } from "vitest"
 import {
+  parsePropertyFilters,
   parsePropertyFlag,
   parsePropertyFlags,
-  parsePropertyFilters,
 } from "./properties.js"
 
 describe("properties parsing", () => {

@@ -1,8 +1,8 @@
-import { command } from "cleye"
 import { readFileSync } from "node:fs"
-import { loadProjectFrom } from "../lib/project.js"
+import { command } from "cleye"
 import { findDocumentById, parseDocumentRef } from "../core/scanner.js"
 import * as cli from "../lib/cli.js"
+import { loadProjectFrom } from "../lib/project.js"
 
 export const readCommand = command(
   {

@@ -1,6 +1,6 @@
-import { tryLocateProjectFile, loadProjectFile } from "../lib/project.js"
-import { runStatusDisplay } from "./status.js"
 import * as cli from "../lib/cli.js"
+import { loadProjectFile, tryLocateProjectFile } from "../lib/project.js"
+import { runStatusDisplay } from "./status.js"
 
 /**
  * Default command when `pm` is run with no arguments.

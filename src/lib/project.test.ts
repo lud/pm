@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from "vitest"
 import { join } from "node:path"
+import { describe, expect, it, vi } from "vitest"
 import {
-  resolveProject,
-  locateProjectFile,
   loadProjectFile,
+  locateProjectFile,
+  resolveProject,
 } from "./project.js"
 import { createTestWorkspace } from "./test-workspace.js"
 

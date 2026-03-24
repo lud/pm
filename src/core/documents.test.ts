@@ -1,15 +1,15 @@
-import { describe, it, expect } from "vitest"
-import { join } from "node:path"
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { describe, expect, it } from "vitest"
 import { parseFrontmatter } from "../lib/frontmatter.js"
 import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 import {
-  readDocument,
-  showDocument,
   createDocument,
   editDocument,
-  markDone,
   markBlocked,
+  markDone,
+  readDocument,
+  showDocument,
 } from "./documents.js"
 
 const testProject = createTestProject("documents")

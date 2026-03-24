@@ -1,5 +1,5 @@
 import table from "text-table"
-import type { ResolvedProject, ResolvedDoctype } from "../lib/project.js"
+import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
 
 function formatDir(dt: ResolvedDoctype): string {
   if (dt.dir === ".") {

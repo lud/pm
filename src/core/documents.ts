@@ -1,20 +1,20 @@
-import { join, dirname } from "node:path"
 import { readFileSync } from "node:fs"
-import { mkdirSyncOrAbort, writeFileSyncOrAbort } from "../lib/fs-helpers.js"
+import { dirname, join } from "node:path"
 import {
   parseFrontmatter,
   prependFrontmatter,
   setFrontmatterProperties,
 } from "../lib/frontmatter.js"
-import type { ResolvedProject, ResolvedDoctype } from "../lib/project.js"
+import { mkdirSyncOrAbort, writeFileSyncOrAbort } from "../lib/fs-helpers.js"
+import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
+import { extractParentId, formatParentRef } from "./parent-ref.js"
 import {
-  findDocumentById,
-  getNextId,
-  formatDocumentFilename,
   collectAllDocuments,
+  findDocumentById,
+  formatDocumentFilename,
+  getNextId,
   type ScannedDocument,
 } from "./scanner.js"
-import { formatParentRef, extractParentId } from "./parent-ref.js"
 
 // ---------------------------------------------------------------------------
 // Types

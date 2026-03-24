@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
 import { join } from "node:path"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createTestWorkspace } from "./test-workspace.js"
 
 // Mock cli.ts to prevent process.exit

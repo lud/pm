@@ -1,12 +1,12 @@
-import { command } from "cleye"
 import {
+  appendFileSync,
   existsSync,
   readFileSync,
   writeFileSync,
-  appendFileSync,
 } from "node:fs"
 import { join, relative } from "node:path"
 import { confirm } from "@inquirer/prompts"
+import { command } from "cleye"
 import * as cli from "../lib/cli.js"
 import { tryLocateProjectFile } from "../lib/project.js"
 

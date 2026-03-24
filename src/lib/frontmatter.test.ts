@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest"
+import { describe, expect, it } from "vitest"
 import {
-  parseFrontmatter,
-  hasFrontmatter,
   formatFrontmatter,
+  hasFrontmatter,
+  parseFrontmatter,
   prependFrontmatter,
-  setFrontmatterProperty,
   setFrontmatterProperties,
+  setFrontmatterProperty,
 } from "./frontmatter.js"
 
 describe("parseFrontmatter", () => {

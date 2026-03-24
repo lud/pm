@@ -1,10 +1,10 @@
 import { command } from "cleye"
-import { loadProjectFrom } from "../lib/project.js"
+import { touchCurrent } from "../core/current.js"
 import { markDone } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
-import { formatPath } from "../lib/format.js"
-import { touchCurrent } from "../core/current.js"
 import * as cli from "../lib/cli.js"
+import { formatPath } from "../lib/format.js"
+import { loadProjectFrom } from "../lib/project.js"
 
 export const doneCommand = command(
   {

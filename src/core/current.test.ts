@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { readFileSync, existsSync } from "node:fs"
+import { describe, expect, it } from "vitest"
 import { createTestWorkspace } from "../lib/test-workspace.js"
 import {
+  clearCurrentId,
   getCurrentId,
   setCurrentId,
-  clearCurrentId,
   touchCurrent,
 } from "./current.js"
 

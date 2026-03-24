@@ -1,4 +1,4 @@
-import { relative, isAbsolute } from "node:path"
+import { isAbsolute, relative } from "node:path"
 
 /**
  * Format a path for display: relative to CWD if it's a child of CWD,

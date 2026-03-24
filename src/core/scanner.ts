@@ -1,6 +1,6 @@
 import { readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
-import type { ResolvedProject, ResolvedDoctype } from "../lib/project.js"
+import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
 
 // ---------------------------------------------------------------------------
 // Filename parsing

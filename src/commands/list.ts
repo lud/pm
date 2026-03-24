@@ -1,8 +1,8 @@
 import { command } from "cleye"
-import { loadProjectFrom } from "../lib/project.js"
-import { listDocuments, type ListOptions } from "../core/listing.js"
+import { type ListOptions, listDocuments } from "../core/listing.js"
 import { parseDocumentRef } from "../core/scanner.js"
 import * as cli from "../lib/cli.js"
+import { loadProjectFrom } from "../lib/project.js"
 import { parsePropertyFilters } from "../lib/properties.js"
 
 export const listCommand = command(

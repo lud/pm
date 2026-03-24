@@ -1,11 +1,11 @@
+import { execSync } from "node:child_process"
 import { command } from "cleye"
-import { loadProjectFrom } from "../lib/project.js"
+import { touchCurrent } from "../core/current.js"
 import { createDocument } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
-import { formatPath } from "../lib/format.js"
-import { touchCurrent } from "../core/current.js"
 import * as cli from "../lib/cli.js"
-import { execSync } from "node:child_process"
+import { formatPath } from "../lib/format.js"
+import { loadProjectFrom } from "../lib/project.js"
 import { parsePropertyFlags } from "../lib/properties.js"
 
 const RESERVED_NEW_SET_KEYS = new Set([
