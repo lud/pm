@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-03-24
+
+### 🚀 Features
+
+- Removed built-in types
+- New blocked states
+- Better formatting output
+- Align status breakdown globally
+- Added 'next' command to help agents find more work
+
+### 🧪 Testing
+
+- New declarative fixture system for tests
+
+### ⚙️ Miscellaneous Tasks
+
+- Format codebase using biome
+- Fixed biome warnings
+
 ## [0.5.0] - 2026-03-24
 
 ### 🚀 Features
