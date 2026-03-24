@@ -27,14 +27,7 @@ export const showCommand = command(
       const fmtId = project.formatId
       const cwd = process.cwd()
       cli.info(formatDocumentHeader(result.document, cwd, fmtId))
-      if (result.parents.length > 0) {
-        cli.info("")
-        cli.info(formatParentsList(result.parents, fmtId))
-      }
-      if (result.children.length > 0) {
-        cli.info("")
-        cli.info(formatChildrenList(result.children, fmtId))
-      }
+      displayDocumentRelations(result, fmtId)
     } catch (err) {
       cli.abortError((err as Error).message)
     }
@@ -84,4 +77,18 @@ export function formatChildrenList(
     lines.push(formatDocLine(child, formatId))
   }
   return lines.join("\n")
+}
+
+export function displayDocumentRelations(
+  result: Pick<ShowResult, "parents" | "children">,
+  formatId: (id: number) => string,
+): void {
+  if (result.parents.length > 0) {
+    cli.info("")
+    cli.info(formatParentsList(result.parents, formatId))
+  }
+  if (result.children.length > 0) {
+    cli.info("")
+    cli.info(formatChildrenList(result.children, formatId))
+  }
 }

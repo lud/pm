@@ -9,11 +9,7 @@ import { showDocument } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
 import * as cli from "../lib/cli.js"
 import { loadProjectFrom } from "../lib/project.js"
-import {
-  formatChildrenList,
-  formatDocumentHeader,
-  formatParentsList,
-} from "./show.js"
+import { displayDocumentRelations, formatDocumentHeader } from "./show.js"
 
 export const currentCommand = command(
   {
@@ -54,13 +50,6 @@ export const currentCommand = command(
     const fmtId = project.formatId
     const cwd = process.cwd()
     cli.info(formatDocumentHeader(result.document, cwd, fmtId))
-    if (result.parents.length > 0) {
-      cli.info("")
-      cli.info(formatParentsList(result.parents, fmtId))
-    }
-    if (result.children.length > 0) {
-      cli.info("")
-      cli.info(formatChildrenList(result.children, fmtId))
-    }
+    displayDocumentRelations(result, fmtId)
   },
 )

@@ -6,7 +6,7 @@ import { getStatusSummary, type StatusSummary } from "../core/listing.js"
 import * as cli from "../lib/cli.js"
 import type { ResolvedProject } from "../lib/project.js"
 import { loadProjectFrom } from "../lib/project.js"
-import { formatDocumentHeader, formatParentsList } from "./show.js"
+import { displayDocumentRelations, formatDocumentHeader } from "./show.js"
 
 function formatStatusMarker(s: {
   status: string
@@ -59,10 +59,7 @@ export function runStatusDisplay(project: ResolvedProject): void {
     if (result) {
       const fmtId = project.formatId
       cli.info(formatDocumentHeader(result.document, process.cwd(), fmtId))
-      if (result.parents.length > 0) {
-        cli.info("")
-        cli.info(formatParentsList(result.parents, fmtId))
-      }
+      displayDocumentRelations(result, fmtId)
     } else {
       cli.warning(`Current document ${currentId} not found`)
     }
