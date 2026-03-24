@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest"
 import { join } from "node:path"
+import { readFileSync, writeFileSync } from "node:fs"
 import { resolveProject } from "../lib/project.js"
 import { listDocuments, getStatusSummary } from "./listing.js"
 import { createTestWorkspace } from "../lib/test-workspace.js"
+import { parseFrontmatter, prependFrontmatter } from "../lib/frontmatter.js"
 
 const FIXTURE_DIR = join(
   import.meta.dirname,
@@ -101,6 +103,50 @@ describe("listDocuments", () => {
     const entries = listDocuments(project, { active: true, done: true })
     const feat = entries.find((e) => e.id === 1)
     expect(feat!.title).toBe("User authentication")
+  })
+
+  it("filters by typed property values", () => {
+    const dir = workspace.copyFixture(FIXTURE_DIR)
+    const filePath = join(
+      dir,
+      "context/features/001.feat.user-auth/004.task.session-store.md",
+    )
+    const content = readFileSync(filePath, "utf-8")
+    const { data, body } = parseFrontmatter(content)
+    writeFileSync(
+      filePath,
+      prependFrontmatter({ ...data, priority: 2, blocked: false }, body),
+    )
+
+    const project = resolveProject(
+      { doctypes: { feature: { dir: "context/features" } } },
+      join(dir, ".pm.json"),
+    )
+
+    const entries = listDocuments(project, {
+      propertyFilters: [
+        { key: "priority", value: 2 },
+        { key: "blocked", value: false },
+      ],
+      active: true,
+      done: true,
+    })
+
+    const ids = entries.map((e) => e.id)
+    expect(ids).toEqual([4])
+  })
+
+  it("requires all propertyFilters to match", () => {
+    const project = loadFixtureProject()
+    const entries = listDocuments(project, {
+      propertyFilters: [
+        { key: "status", value: "new" },
+        { key: "status", value: "done" },
+      ],
+      active: true,
+      done: true,
+    })
+    expect(entries).toHaveLength(0)
   })
 
   it("sorts results by ID, not by filesystem order", () => {

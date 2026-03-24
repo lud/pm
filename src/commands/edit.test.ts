@@ -65,12 +65,13 @@ describe("edit command", () => {
     vi.clearAllMocks()
   })
 
-  it("sets a property via key:value arg", () => {
+  it("sets a property via --set", () => {
     const dir = setupMutableProject()
 
     cli({ name: "pm", commands: [editCommand] }, undefined, [
       "edit",
       "1",
+      "--set",
       "status:in-progress",
     ])
 
@@ -91,7 +92,9 @@ describe("edit command", () => {
     cli({ name: "pm", commands: [editCommand] }, undefined, [
       "edit",
       "1",
+      "--set",
       "status:active",
+      "--set",
       "priority:high",
     ])
 
@@ -104,16 +107,56 @@ describe("edit command", () => {
     expect(data.priority).toBe("high")
   })
 
-  it("aborts on invalid property format", () => {
+  it("parses numbers and booleans in --set values", () => {
+    const dir = setupMutableProject()
+
+    cli({ name: "pm", commands: [editCommand] }, undefined, [
+      "edit",
+      "1",
+      "--set",
+      "count:-2",
+      "--set",
+      "ratio:3.14",
+      "--set",
+      "ready:False",
+      "--set",
+      "weird:123foo",
+    ])
+
+    const content = readFileSync(
+      join(dir, "context/features/001.feat.user-auth/001.feat.user-auth.md"),
+      "utf-8",
+    )
+    const { data } = parseFrontmatter(content)
+    expect(data.count).toBe(-2)
+    expect(data.ratio).toBe(3.14)
+    expect(data.ready).toBe(false)
+    expect(data.weird).toBe("123foo")
+  })
+
+  it("aborts on invalid --set format", () => {
     setupMutableProject()
 
     expect(() =>
       cli({ name: "pm", commands: [editCommand] }, undefined, [
         "edit",
         "1",
+        "--set",
         "no-colon",
       ]),
-    ).toThrow("Invalid property format")
+    ).toThrow("Invalid --set format")
+  })
+
+  it("aborts when positional properties are used", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [editCommand] }, undefined, [
+        "edit",
+        "1",
+        "status:done",
+      ]),
+    ).toThrow()
   })
 
   it("aborts on invalid document ID", () => {
@@ -139,5 +182,20 @@ describe("edit command", () => {
         "xyz",
       ]),
     ).toThrow("Invalid parent ID")
+  })
+
+  it("aborts when --parent conflicts with --set parent", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [editCommand] }, undefined, [
+        "edit",
+        "4",
+        "--parent",
+        "2",
+        "--set",
+        "parent:2",
+      ]),
+    ).toThrow("Cannot combine --parent with --set parent")
   })
 })

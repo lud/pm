@@ -242,6 +242,19 @@ describe("createDocument", () => {
     expect(data.status).toBe("urgent")
   })
 
+  it("merges setProperties into frontmatter", () => {
+    const project = loadMutableProject()
+    const result = createDocument(project, "feature", "With props", {
+      setProperties: { estimate: 3, blocked: false, owner: "alice" },
+    })
+
+    const content = readFileSync(result.path, "utf-8")
+    const { data } = parseFrontmatter(content)
+    expect(data.estimate).toBe(3)
+    expect(data.blocked).toBe(false)
+    expect(data.owner).toBe("alice")
+  })
+
   it("places spec in parent feature's self directory", () => {
     const project = loadMutableProject()
     const result = createDocument(project, "spec", "Nested spec", {
@@ -303,6 +316,17 @@ describe("editDocument", () => {
     })
     expect(doc.frontmatter.status).toBe("done")
     expect(doc.frontmatter.priority).toBe("high")
+  })
+
+  it("preserves typed values when updating properties", () => {
+    const project = loadMutableProject()
+    const doc = editDocument(project, 1, {
+      setProperties: { retries: -2, ratio: 3.14, blocked: true },
+    })
+
+    expect(doc.frontmatter.retries).toBe(-2)
+    expect(doc.frontmatter.ratio).toBe(3.14)
+    expect(doc.frontmatter.blocked).toBe(true)
   })
 
   it("sets parent as ref string", () => {

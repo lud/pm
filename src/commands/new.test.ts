@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { join } from "node:path"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { cli } from "cleye"
 import { resolveProject } from "../lib/project.js"
 import { createTestWorkspace } from "../lib/test-workspace.js"
+import { parseFrontmatter } from "../lib/frontmatter.js"
 
 vi.mock("../lib/cli.js", async () => {
   const actual = (await vi.importActual("../lib/cli.js")) as Record<
@@ -146,6 +147,62 @@ describe("new command", () => {
         "abc",
       ]),
     ).toThrow()
+  })
+
+  it("sets typed frontmatter properties via --set", () => {
+    const dir = setupMutableProject()
+
+    cli({ name: "pm", commands: [newCommand] }, undefined, [
+      "new",
+      "feature",
+      "Typed",
+      "props",
+      "--set",
+      "priority:2",
+      "--set",
+      "blocked:TRUE",
+      "--set",
+      "label:high",
+    ])
+
+    const createdPath = join(
+      dir,
+      "context/features/005.feat.typed-props/005.feat.typed-props.md",
+    )
+    const content = readFileSync(createdPath, "utf-8")
+    const { data } = parseFrontmatter(content)
+
+    expect(data.priority).toBe(2)
+    expect(data.blocked).toBe(true)
+    expect(data.label).toBe("high")
+  })
+
+  it("aborts when --set targets reserved new fields", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [newCommand] }, undefined, [
+        "new",
+        "feature",
+        "Title",
+        "--set",
+        "status:done",
+      ]),
+    ).toThrow('Cannot use --set status:... with "new"')
+  })
+
+  it("aborts on malformed --set assignment", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [newCommand] }, undefined, [
+        "new",
+        "feature",
+        "Title",
+        "--set",
+        "bad",
+      ]),
+    ).toThrow("Invalid --set format")
   })
 
   it("warns when --editor is set but no editor configured", () => {

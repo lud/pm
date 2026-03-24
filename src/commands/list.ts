@@ -4,6 +4,7 @@ import { listDocuments, type ListFilter } from "../core/listing.js"
 import { parseDocumentRef } from "../core/scanner.js"
 import { formatPath } from "../lib/format.js"
 import * as cli from "../lib/cli.js"
+import { parsePropertyFilters } from "../lib/properties.js"
 
 export const listCommand = command(
   {
@@ -33,6 +34,10 @@ export const listCommand = command(
         type: String,
         description: "Filter by exact status",
       },
+      is: {
+        type: [String],
+        description: "Filter by frontmatter property key:value",
+      },
     },
   },
   (argv) => {
@@ -57,6 +62,15 @@ export const listCommand = command(
 
     if (argv.flags.status) {
       filter.status = argv.flags.status
+    }
+
+    try {
+      const propertyFilters = parsePropertyFilters(argv.flags.is, "--is")
+      if (propertyFilters.length > 0) {
+        filter.propertyFilters = propertyFilters
+      }
+    } catch (err) {
+      cli.abortError((err as Error).message)
     }
 
     if (argv.flags.active) filter.active = true

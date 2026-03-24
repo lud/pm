@@ -5,6 +5,7 @@ import { parseDocumentRef } from "../core/scanner.js"
 import { formatPath } from "../lib/format.js"
 import { touchCurrent } from "../core/current.js"
 import * as cli from "../lib/cli.js"
+import { parsePropertyFlags } from "../lib/properties.js"
 
 export const editCommand = command(
   {
@@ -16,6 +17,10 @@ export const editCommand = command(
         alias: "p",
         description: "Set parent document ID",
       },
+      set: {
+        type: [String],
+        description: "Set frontmatter property: key:value",
+      },
     },
   },
   (argv) => {
@@ -25,17 +30,18 @@ export const editCommand = command(
       cli.abortError(`Invalid document ID: "${argv._.id}"`)
     }
 
-    const properties: Record<string, unknown> = {}
+    if (argv._.properties.length > 0) {
+      cli.abortError(
+        "Positional key:value properties are no longer supported. Use --set key:value",
+      )
+    }
 
-    // Parse key:value pairs from positional arguments
-    for (const arg of argv._.properties) {
-      const colonIdx = arg.indexOf(":")
-      if (colonIdx === -1) {
-        cli.abortError(`Invalid property format: "${arg}". Expected key:value`)
-      }
-      const key = arg.slice(0, colonIdx)
-      const value = arg.slice(colonIdx + 1)
-      properties[key] = value
+    let properties: Record<string, unknown>
+    try {
+      properties = parsePropertyFlags(argv.flags.set, "--set")
+    } catch (err) {
+      cli.abortError((err as Error).message)
+      return
     }
 
     let setParent: number | undefined
@@ -43,6 +49,12 @@ export const editCommand = command(
       setParent = parseDocumentRef(argv.flags.parent) ?? undefined
       if (setParent === undefined) {
         cli.abortError(`Invalid parent ID: "${argv.flags.parent}"`)
+      }
+
+      if (Object.prototype.hasOwnProperty.call(properties, "parent")) {
+        cli.abortError(
+          'Cannot combine --parent with --set parent:... on "edit"',
+        )
       }
     }
 

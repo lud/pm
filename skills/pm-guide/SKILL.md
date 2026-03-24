@@ -109,6 +109,8 @@ pm list                    # List all active documents
 pm list -t task            # List active tasks only
 pm list --done             # List done documents
 pm list -p 001             # List descendants of document 001
+pm list --status blocked --is owner:alice  # Filter by status and custom property
+pm list --is priority:2    # Filter by numeric custom property
 pm show 003                # Show document 003 with parents and children
 pm read 003                # Print full file contents of document 003
 pm current                 # Show the current document and its context
@@ -122,6 +124,7 @@ pm new feature User authentication           # Create a feature (title: "User au
 pm new spec Login flow -p 001                # Create a spec under feature 001
 pm new task Add JWT middleware -p 002        # Create a task under spec 002
 pm new feature Payment -s urgent             # Create with custom status
+pm new feature Search --set status:blocked   # Custom status via property
 pm new spec API design -p 001 -e             # Create and open in $EDITOR
 ```
 
@@ -131,12 +134,16 @@ from the title (lowercased, spaces become hyphens).
 ### Updating documents
 
 ```bash
-pm edit 003 status:in-progress               # Set status
-pm edit 003 status:blocked reason:"waiting on API"  # Set multiple properties
+pm edit 003 --set status:in-progress         # Set status
+pm edit 003 --set status:blocked --set reason:"waiting on API"  # Set multiple properties
+pm edit 003 --set status:urgent              # Set a custom status value
 pm edit 003 -p 002                           # Set/change parent
 pm done 003                                  # Mark as done (first done status)
 pm current 003                               # Set document 003 as current
 ```
+
+Use `--set key:value` for frontmatter updates. Positional `key:value` arguments
+are no longer supported by `pm edit`.
 
 ## Typical workflow
 
@@ -158,6 +165,9 @@ pm current 003                               # Set document 003 as current
   and is the usual canonical format.
 - Use `pm current <id>` to track what you're working on — the next session will
   pick up from there.
-- Statuses are free-form. Common ones: `new`, `in-progress`, `blocked`,
-  `specified` (for specs), `done`.
+- Statuses are free-form. Set them on create with `pm new ... -s <status>` or
+  with `pm new ... --set status:<status>`, and update them with
+  `pm edit <id> --set status:<status>`.
+- Common statuses: `new`, `in-progress`, `blocked`, `specified` (for specs),
+  `done`.
 - The `--help` flag on any command shows all available options.

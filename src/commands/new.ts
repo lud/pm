@@ -6,6 +6,15 @@ import { formatPath } from "../lib/format.js"
 import { touchCurrent } from "../core/current.js"
 import * as cli from "../lib/cli.js"
 import { execSync } from "node:child_process"
+import { parsePropertyFlags } from "../lib/properties.js"
+
+const RESERVED_NEW_SET_KEYS = new Set([
+  "id",
+  "title",
+  "status",
+  "parent",
+  "created_on",
+])
 
 export const newCommand = command(
   {
@@ -28,6 +37,10 @@ export const newCommand = command(
         alias: "s",
         description: "Initial status (overrides default)",
       },
+      set: {
+        type: [String],
+        description: "Set frontmatter property: key:value",
+      },
     },
   },
   (argv) => {
@@ -44,10 +57,28 @@ export const newCommand = command(
       }
     }
 
+    let setProperties: Record<string, unknown>
+    try {
+      setProperties = parsePropertyFlags(argv.flags.set, "--set")
+    } catch (err) {
+      cli.abortError((err as Error).message)
+      return
+    }
+
+    for (const key of Object.keys(setProperties)) {
+      if (RESERVED_NEW_SET_KEYS.has(key)) {
+        cli.abortError(
+          `Cannot use --set ${key}:... with "new". Use dedicated inputs instead.`,
+        )
+      }
+    }
+
     try {
       const result = createDocument(project, doctypeName, title, {
         parentId,
         status: argv.flags.status ?? undefined,
+        setProperties:
+          Object.keys(setProperties).length > 0 ? setProperties : undefined,
       })
 
       touchCurrent(project.projectDir)

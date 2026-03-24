@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { parseFrontmatter } from "../lib/frontmatter.js"
 import type { ResolvedProject } from "../lib/project.js"
+import type { PropertyFilter } from "../lib/properties.js"
 import { collectAllDocuments, type ScannedDocument } from "./scanner.js"
 import { extractParentId } from "./parent-ref.js"
 import type { DocumentInfo } from "./documents.js"
@@ -13,6 +14,7 @@ export type ListFilter = {
   doctype?: string
   parentId?: number
   status?: string
+  propertyFilters?: PropertyFilter[]
   active?: boolean
   done?: boolean
 }
@@ -77,6 +79,19 @@ export function listDocuments(
     // Filter by exact status
     if (filter.status !== undefined && status !== filter.status) {
       continue
+    }
+
+    if (filter.propertyFilters && filter.propertyFilters.length > 0) {
+      let matches = true
+      for (const propertyFilter of filter.propertyFilters) {
+        if (data[propertyFilter.key] !== propertyFilter.value) {
+          matches = false
+          break
+        }
+      }
+      if (!matches) {
+        continue
+      }
     }
 
     // Filter by active/done

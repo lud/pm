@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { join } from "node:path"
+import { readFileSync, writeFileSync } from "node:fs"
 import { cli } from "cleye"
 import { resolveProject } from "../lib/project.js"
+import { prependFrontmatter, parseFrontmatter } from "../lib/frontmatter.js"
+import { createTestWorkspace } from "../lib/test-workspace.js"
 
 vi.mock("../lib/cli.js", async () => {
   const actual = (await vi.importActual("../lib/cli.js")) as Record<
@@ -42,19 +45,23 @@ const FIXTURE_DIR = join(
   import.meta.dirname,
   "../../test/fixtures/basic-project",
 )
+const workspace = createTestWorkspace("list-cmd")
 
 function infoLines(): string[] {
   return vi.mocked(cliMod.info).mock.calls.map(([msg]) => msg)
 }
 
 describe("list command", () => {
+  let dir: string
+
   beforeEach(() => {
+    dir = workspace.copyFixture(FIXTURE_DIR)
     vi.clearAllMocks()
-    vi.spyOn(process, "cwd").mockReturnValue(FIXTURE_DIR)
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
     vi.mocked(loadProjectFrom).mockReturnValue(
       resolveProject(
         { doctypes: { feature: { dir: "context/features" } } },
-        join(FIXTURE_DIR, ".pm.json"),
+        join(dir, ".pm.json"),
       ),
     )
   })
@@ -142,5 +149,42 @@ describe("list command", () => {
         "abc",
       ]),
     ).toThrow("Invalid parent ID")
+  })
+
+  it("filters by typed frontmatter with --is", () => {
+    const filePath = join(
+      dir,
+      "context/features/001.feat.user-auth/004.task.session-store.md",
+    )
+    const content = readFileSync(filePath, "utf-8")
+    const { data, body } = parseFrontmatter(content)
+    writeFileSync(
+      filePath,
+      prependFrontmatter({ ...data, priority: 2, blocked: false }, body),
+    )
+
+    cli({ name: "pm", commands: [listCommand] }, undefined, [
+      "list",
+      "--is",
+      "priority:2",
+      "--is",
+      "blocked:false",
+      "--active",
+      "--done",
+    ])
+
+    const lines = infoLines()
+    expect(lines.some((l) => l.includes("Session store"))).toBe(true)
+    expect(lines.some((l) => l.includes("Add JWT middleware"))).toBe(false)
+  })
+
+  it("aborts on malformed --is assignment", () => {
+    expect(() =>
+      cli({ name: "pm", commands: [listCommand] }, undefined, [
+        "list",
+        "--is",
+        "bad",
+      ]),
+    ).toThrow("Invalid --is format")
   })
 })

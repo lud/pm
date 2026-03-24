@@ -116,6 +116,7 @@ export function createDocument(
   options: {
     parentId?: number
     status?: string
+    setProperties?: Record<string, unknown>
   } = {},
 ): CreateResult {
   const doctype = project.doctypes[doctypeName]
@@ -181,6 +182,7 @@ export function createDocument(
     title,
     status,
     created_on: new Date().toISOString().slice(0, 10),
+    ...options.setProperties,
   }
   if (parentDoc !== null) {
     frontmatterData.parent = formatParentRef(
