@@ -22,12 +22,11 @@ src/
   lib/
     cli.ts                  # Output helpers (write, warning, error, etc.)
     fs-helpers.ts           # Filesystem wrappers with abort-on-error
-    project.ts              # Project config loading, schema, defaults, merge
+    project.ts              # Project config loading, schema, validation
     frontmatter.ts          # YAML frontmatter parsing and formatting
     format.ts               # Path display formatting
-    test-workspace.ts       # Mutable test fixture helper
-test/
-  fixtures/                 # Real files used by tests
+    test-workspace.ts       # Temporary directory helper for tests
+    test-setup.ts           # Declarative test project setup helper
 tools/
   build-json-schema.ts      # Generates resources/pm-project.schema.json from Zod schema
 ```
@@ -47,9 +46,9 @@ tools/
 - `resolveProject(rawConfig, projectFile)` — resolves a raw config object. Used directly in tests (no disk access needed).
 - All paths in `ResolvedProject` are **absolute**. Relative paths only exist in `.pm.json` on disk.
 
-### Default doctypes
+### No default doctypes
 
-Feature, spec, and task are built-in. User config is deep-merged on top. Setting a doctype to `null` removes it from defaults.
+There are no built-in doctypes. The `.pm.json` file is the sole source of truth — all doctypes must be explicitly defined. `pm init` writes a complete default config with feature, spec, and task.
 
 ## Commands
 
@@ -120,19 +119,30 @@ vi.mock("./cli.js", async () => {
 })
 ```
 
-**Fixtures** in `test/fixtures/` are real files on disk. Prefer them over mocking `fs`.
-
-**Mutable fixtures:** When tests need to rename, delete, or write files, use `createTestWorkspace(label)` from `src/lib/test-workspace.ts`:
+**Test projects** are set up declaratively with `createTestProject(label)` from `src/lib/test-setup.ts`. Each `setup()` call creates a fresh temp directory with `.pm.json`, optional `.pm.current`, and all declared document files:
 
 ```typescript
-import { createTestWorkspace } from "../lib/test-workspace.js"
+import { createTestProject } from "../lib/test-setup.js"
 
-const workspace = createTestWorkspace("mytest")
+const testProject = createTestProject("mytest")
 
-it("mutates files", () => {
-  const dir = workspace.copyFixture(fixtureDir)  // mutable copy in /tmp
-  // ... mutate files in dir ...
+it("does something", () => {
+  const { dir, project } = testProject.setup({
+    pmJson: {
+      doctypes: {
+        feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+        spec: { tag: "spec", dir: ".", parent: "feature" },
+        task: { tag: "task", dir: ".", parent: "spec" },
+      },
+    },
+    pmCurrent: 3, // optional — writes .pm.current
+    files: {
+      "context/features/001.feat.auth/001.feat.auth.md": { title: "Auth", status: "new" },
+      "context/features/001.feat.auth/002.spec.login.md": { parent: 1, title: "Login", status: "new" },
+    },
+  })
+  // dir is the temp directory, project is a ResolvedProject
 })
 ```
 
-Cleanup is automatic via `afterAll`.
+Cleanup is automatic via `afterAll`. For tests that only need an empty temp directory (no project setup), use `createTestWorkspace(label)` from `src/lib/test-workspace.ts`.

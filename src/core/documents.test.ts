@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest"
 import { join } from "node:path"
-import { readFileSync, writeFileSync } from "node:fs"
-import { resolveProject } from "../lib/project.js"
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
 import { parseFrontmatter } from "../lib/frontmatter.js"
-import { createTestWorkspace } from "../lib/test-workspace.js"
+import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 import {
   readDocument,
   showDocument,
@@ -12,31 +11,41 @@ import {
   markDone,
 } from "./documents.js"
 
-const FIXTURE_DIR = join(
-  import.meta.dirname,
-  "../../test/fixtures/basic-project",
-)
-const workspace = createTestWorkspace("documents")
+const testProject = createTestProject("documents")
 
-const FULL_DOCTYPES = {
-  feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-  spec: { tag: "spec", dir: ".", parent: "feature" },
-  task: { tag: "task", dir: ".", parent: "spec" },
-}
-
-function loadFixtureProject() {
-  return resolveProject(
-    { doctypes: FULL_DOCTYPES },
-    join(FIXTURE_DIR, ".pm.json"),
-  )
-}
-
-function loadMutableProject() {
-  const dir = workspace.copyFixture(FIXTURE_DIR)
-  return resolveProject(
-    { doctypes: FULL_DOCTYPES },
-    join(dir, ".pm.json"),
-  )
+const BASIC_SETUP: TestSetup = {
+  pmJson: {
+    doctypes: {
+      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+      spec: { tag: "spec", dir: ".", parent: "feature" },
+      task: { tag: "task", dir: ".", parent: "spec" },
+    },
+  },
+  files: {
+    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
+      title: "User authentication",
+      status: "new",
+      created_on: "2026-03-20",
+    },
+    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
+      parent: "1.feat.user-auth",
+      title: "Login flow",
+      status: "new",
+      created_on: "2026-03-20",
+    },
+    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
+      parent: "2.spec.login-flow",
+      title: "Add JWT middleware",
+      status: "done",
+      created_on: "2026-03-21",
+    },
+    "context/features/001.feat.user-auth/004.task.session-store.md": {
+      parent: "2.spec.login-flow",
+      title: "Session store",
+      status: "new",
+      created_on: "2026-03-21",
+    },
+  },
 }
 
 // ---------------------------------------------------------------------------
@@ -45,7 +54,7 @@ function loadMutableProject() {
 
 describe("readDocument", () => {
   it("reads document with frontmatter", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = readDocument(project, 1)
     expect(doc).not.toBeNull()
     expect(doc!.frontmatter.title).toBe("User authentication")
@@ -54,18 +63,25 @@ describe("readDocument", () => {
   })
 
   it("returns null for non-existent document", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     expect(readDocument(project, 999)).toBeNull()
   })
 
   it("includes body content", () => {
-    const project = loadFixtureProject()
+    const { dir, project } = testProject.setup(BASIC_SETUP)
+    // Append body content after setup (setup only writes frontmatter)
+    const filePath = join(
+      dir,
+      "context/features/001.feat.user-auth/001.feat.user-auth.md",
+    )
+    appendFileSync(filePath, "\nFeature for user authentication.\n")
+
     const doc = readDocument(project, 1)
     expect(doc!.body).toContain("Feature for user authentication")
   })
 
   it("does not include id in frontmatter", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = readDocument(project, 1)
     expect(doc!.frontmatter.id).toBeUndefined()
     // But the id is available from the filename
@@ -79,9 +95,9 @@ describe("readDocument", () => {
 
 describe("showDocument", () => {
   it("resolves hierarchy when child uses numeric parent shorthand", () => {
-    const project = loadMutableProject()
+    const { dir, project } = testProject.setup(BASIC_SETUP)
     const specPath = join(
-      project.projectDir,
+      dir,
       "context/features/001.feat.user-auth/002.spec.login-flow.md",
     )
     const updated = readFileSync(specPath, "utf-8").replace(
@@ -104,7 +120,7 @@ describe("showDocument", () => {
   })
 
   it("resolves hierarchy when child uses full parent reference", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const specView = showDocument(project, 2)
     expect(specView).not.toBeNull()
     expect(specView!.parents).toHaveLength(1)
@@ -119,7 +135,7 @@ describe("showDocument", () => {
   })
 
   it("returns document with parents and children", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const result = showDocument(project, 2) // spec
     expect(result).not.toBeNull()
     expect(result!.document.id).toBe(2)
@@ -137,19 +153,19 @@ describe("showDocument", () => {
   })
 
   it("returns empty parents for root document", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const result = showDocument(project, 1) // feature (root)
     expect(result!.parents).toHaveLength(0)
   })
 
   it("returns empty children for leaf document", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const result = showDocument(project, 3) // task (leaf)
     expect(result!.children).toHaveLength(0)
   })
 
   it("returns null for non-existent document", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     expect(showDocument(project, 999)).toBeNull()
   })
 })
@@ -160,7 +176,7 @@ describe("showDocument", () => {
 
 describe("createDocument", () => {
   it("creates a feature document with intermediate dir", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const result = createDocument(project, "feature", "Payment system")
 
     expect(result.id).toBe(5)
@@ -177,7 +193,7 @@ describe("createDocument", () => {
   })
 
   it("creates a spec document with parent ref string", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const result = createDocument(project, "spec", "API design", {
       parentId: 1,
     })
@@ -191,7 +207,7 @@ describe("createDocument", () => {
   })
 
   it("creates a task document with parent spec ref", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const result = createDocument(project, "task", "Write tests", {
       parentId: 2,
     })
@@ -203,14 +219,14 @@ describe("createDocument", () => {
   })
 
   it("throws when required parent is missing", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     expect(() => createDocument(project, "spec", "No parent")).toThrow(
       /requires a parent/,
     )
   })
 
   it("throws when parent is wrong doctype", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     // Task needs a spec parent, not a feature
     expect(() =>
       createDocument(project, "task", "Bad parent", { parentId: 1 }),
@@ -218,28 +234,28 @@ describe("createDocument", () => {
   })
 
   it("throws when parent does not exist", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     expect(() =>
       createDocument(project, "spec", "Ghost parent", { parentId: 999 }),
     ).toThrow(/not found/)
   })
 
   it("throws for unknown doctype", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     expect(() => createDocument(project, "bogus", "Nope")).toThrow(
       /Unknown doctype/,
     )
   })
 
   it("throws when parent given to doctype with no parent config", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     expect(() =>
       createDocument(project, "feature", "Bad", { parentId: 1 }),
     ).toThrow(/does not accept a parent/)
   })
 
   it("uses custom status when provided", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const result = createDocument(project, "feature", "Custom", {
       status: "urgent",
     })
@@ -249,7 +265,7 @@ describe("createDocument", () => {
   })
 
   it("merges setProperties into frontmatter", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const result = createDocument(project, "feature", "With props", {
       setProperties: { estimate: 3, blocked: false, owner: "alice" },
     })
@@ -262,7 +278,7 @@ describe("createDocument", () => {
   })
 
   it("places spec in parent feature's self directory", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const result = createDocument(project, "spec", "Nested spec", {
       parentId: 1,
     })
@@ -271,27 +287,18 @@ describe("createDocument", () => {
   })
 
   it("overflows idMask without problems", () => {
-    // Create a project with idMask "0" (single digit) and a document with ID 9
-    const dir = workspace.dir("overflow-mask")
-    const { mkdirSync, writeFileSync } = require("node:fs")
-    const featDir = join(dir, "features", "9.feat.nine")
-    mkdirSync(featDir, { recursive: true })
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
+    const { project } = testProject.setup({
+      pmJson: {
         idMask: "0",
-        doctypes: { feature: { dir: "features" } },
-      }),
-    )
-    writeFileSync(
-      join(featDir, "9.feat.nine.md"),
-      "---\ntitle: Feature nine\nstatus: new\n---\n",
-    )
-
-    const project = resolveProject(
-      { idMask: "0", doctypes: { feature: { tag: "feat", dir: "features" } } },
-      join(dir, ".pm.json"),
-    )
+        doctypes: { feature: { tag: "feat", dir: "features" } },
+      },
+      files: {
+        "features/9.feat.nine/9.feat.nine.md": {
+          title: "Feature nine",
+          status: "new",
+        },
+      },
+    })
 
     // Next ID should be 10, and the filename should be "10.feat.ten.md"
     const result = createDocument(project, "feature", "Ten")
@@ -308,7 +315,7 @@ describe("createDocument", () => {
 
 describe("editDocument", () => {
   it("updates a property", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = editDocument(project, 1, {
       setProperties: { status: "in-progress" },
     })
@@ -316,7 +323,7 @@ describe("editDocument", () => {
   })
 
   it("updates multiple properties", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = editDocument(project, 1, {
       setProperties: { status: "done", priority: "high" },
     })
@@ -325,7 +332,7 @@ describe("editDocument", () => {
   })
 
   it("preserves typed values when updating properties", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = editDocument(project, 1, {
       setProperties: { retries: -2, ratio: 3.14, blocked: true },
     })
@@ -336,13 +343,13 @@ describe("editDocument", () => {
   })
 
   it("sets parent as ref string", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = editDocument(project, 4, { setParent: 2 })
     expect(doc.frontmatter.parent).toBe("2.spec.login-flow")
   })
 
   it("throws when setting parent to wrong doctype", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     // Task needs spec parent, not feature
     expect(() => editDocument(project, 3, { setParent: 1 })).toThrow(
       /expected "spec"/,
@@ -350,14 +357,14 @@ describe("editDocument", () => {
   })
 
   it("throws for non-existent document", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     expect(() =>
       editDocument(project, 999, { setProperties: { status: "done" } }),
     ).toThrow(/not found/)
   })
 
   it("returns unchanged document when no updates", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = editDocument(project, 1, {})
     expect(doc.frontmatter.title).toBe("User authentication")
   })
@@ -369,25 +376,25 @@ describe("editDocument", () => {
 
 describe("markDone", () => {
   it("sets status to first doneStatus for feature", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = markDone(project, 1)
     expect(doc.frontmatter.status).toBe("done")
   })
 
   it("sets status to 'done' for spec", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = markDone(project, 2)
     expect(doc.frontmatter.status).toBe("done")
   })
 
   it("sets status to 'done' for task", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = markDone(project, 4)
     expect(doc.frontmatter.status).toBe("done")
   })
 
   it("throws for non-existent document", () => {
-    const project = loadMutableProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     expect(() => markDone(project, 999)).toThrow(/not found/)
   })
 })

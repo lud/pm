@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { join } from "node:path"
-import { resolveProject } from "../lib/project.js"
+import { createTestProject } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {
   const actual = (await vi.importActual("../lib/cli.js")) as Record<
@@ -41,10 +41,42 @@ import * as cliMod from "../lib/cli.js"
 import { tryLocateProjectFile, loadProjectFile } from "../lib/project.js"
 import { runDefaultCommand } from "./default.js"
 
-const FIXTURE_DIR = join(
-  import.meta.dirname,
-  "../../test/fixtures/basic-project",
-)
+const testProject = createTestProject("default-cmd")
+
+const BASIC_SETUP = {
+  pmJson: {
+    doctypes: {
+      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+      spec: { tag: "spec", dir: ".", parent: "feature" },
+      task: { tag: "task", dir: ".", parent: "spec" },
+    },
+  },
+  files: {
+    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
+      title: "User authentication",
+      status: "new",
+      created_on: "2026-03-20",
+    },
+    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
+      parent: "1.feat.user-auth",
+      title: "Login flow",
+      status: "new",
+      created_on: "2026-03-20",
+    },
+    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
+      parent: "2.spec.login-flow",
+      title: "Add JWT middleware",
+      status: "done",
+      created_on: "2026-03-21",
+    },
+    "context/features/001.feat.user-auth/004.task.session-store.md": {
+      parent: "2.spec.login-flow",
+      title: "Session store",
+      status: "new",
+      created_on: "2026-03-21",
+    },
+  },
+} as const
 
 describe("default command", () => {
   afterEach(() => {
@@ -62,15 +94,11 @@ describe("default command", () => {
   })
 
   it("shows status summary when project exists", () => {
-    vi.spyOn(process, "cwd").mockReturnValue(FIXTURE_DIR)
-    const pmJson = join(FIXTURE_DIR, ".pm.json")
+    const { dir, project } = testProject.setup(BASIC_SETUP)
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    const pmJson = join(dir, ".pm.json")
     vi.mocked(tryLocateProjectFile).mockReturnValue(pmJson)
-    vi.mocked(loadProjectFile).mockReturnValue(
-      resolveProject(
-        { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
-        pmJson,
-      ),
-    )
+    vi.mocked(loadProjectFile).mockReturnValue(project)
 
     runDefaultCommand()
 

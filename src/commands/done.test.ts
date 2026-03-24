@@ -1,9 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { describe, it, expect, vi, afterEach } from "vitest"
 import { join } from "node:path"
 import { readFileSync } from "node:fs"
 import { cli } from "cleye"
-import { resolveProject } from "../lib/project.js"
-import { createTestWorkspace } from "../lib/test-workspace.js"
+import { createTestProject } from "../lib/test-setup.js"
 import { parseFrontmatter } from "../lib/frontmatter.js"
 
 vi.mock("../lib/cli.js", async () => {
@@ -41,11 +40,42 @@ import * as cliMod from "../lib/cli.js"
 import { loadProjectFrom } from "../lib/project.js"
 import { doneCommand } from "./done.js"
 
-const FIXTURE_DIR = join(
-  import.meta.dirname,
-  "../../test/fixtures/basic-project",
-)
-const workspace = createTestWorkspace("done-cmd")
+const testProject = createTestProject("done-cmd")
+
+const BASIC_SETUP = {
+  pmJson: {
+    doctypes: {
+      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+      spec: { tag: "spec", dir: ".", parent: "feature" },
+      task: { tag: "task", dir: ".", parent: "spec" },
+    },
+  },
+  files: {
+    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
+      title: "User authentication",
+      status: "new",
+      created_on: "2026-03-20",
+    },
+    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
+      parent: "1.feat.user-auth",
+      title: "Login flow",
+      status: "new",
+      created_on: "2026-03-20",
+    },
+    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
+      parent: "2.spec.login-flow",
+      title: "Add JWT middleware",
+      status: "done",
+      created_on: "2026-03-21",
+    },
+    "context/features/001.feat.user-auth/004.task.session-store.md": {
+      parent: "2.spec.login-flow",
+      title: "Session store",
+      status: "new",
+      created_on: "2026-03-21",
+    },
+  },
+} as const
 
 describe("done command", () => {
   afterEach(() => {
@@ -54,14 +84,9 @@ describe("done command", () => {
 
   it("marks a document as done", () => {
     vi.clearAllMocks()
-    const dir = workspace.copyFixture(FIXTURE_DIR)
+    const { dir, project } = testProject.setup(BASIC_SETUP)
     vi.spyOn(process, "cwd").mockReturnValue(dir)
-    vi.mocked(loadProjectFrom).mockReturnValue(
-      resolveProject(
-        { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
-        join(dir, ".pm.json"),
-      ),
-    )
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
 
     // Doc 4 (session-store) has status "new"
     cli({ name: "pm", commands: [doneCommand] }, undefined, ["done", "4"])
@@ -83,14 +108,9 @@ describe("done command", () => {
 
   it("aborts on non-existent document", () => {
     vi.clearAllMocks()
-    const dir = workspace.copyFixture(FIXTURE_DIR)
+    const { dir, project } = testProject.setup(BASIC_SETUP)
     vi.spyOn(process, "cwd").mockReturnValue(dir)
-    vi.mocked(loadProjectFrom).mockReturnValue(
-      resolveProject(
-        { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
-        join(dir, ".pm.json"),
-      ),
-    )
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
 
     expect(() =>
       cli({ name: "pm", commands: [doneCommand] }, undefined, ["done", "999"]),
@@ -99,13 +119,9 @@ describe("done command", () => {
 
   it("aborts on invalid ID", () => {
     vi.clearAllMocks()
-    vi.spyOn(process, "cwd").mockReturnValue(FIXTURE_DIR)
-    vi.mocked(loadProjectFrom).mockReturnValue(
-      resolveProject(
-        { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
-        join(FIXTURE_DIR, ".pm.json"),
-      ),
-    )
+    const { dir, project } = testProject.setup(BASIC_SETUP)
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
 
     expect(() =>
       cli({ name: "pm", commands: [doneCommand] }, undefined, ["done", "abc"]),

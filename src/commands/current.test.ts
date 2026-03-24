@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { join } from "node:path"
+import { writeFileSync } from "node:fs"
 import { cli } from "cleye"
-import { resolveProject } from "../lib/project.js"
-import { createTestWorkspace } from "../lib/test-workspace.js"
+import { createTestProject } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {
   const actual = (await vi.importActual("../lib/cli.js")) as Record<
@@ -39,21 +39,47 @@ import * as cliMod from "../lib/cli.js"
 import { loadProjectFrom } from "../lib/project.js"
 import { currentCommand } from "./current.js"
 
-const FIXTURE_DIR = join(
-  import.meta.dirname,
-  "../../test/fixtures/basic-project",
-)
-const workspace = createTestWorkspace("current-cmd")
+const testProject = createTestProject("current-cmd")
+
+const BASIC_SETUP = {
+  pmJson: {
+    doctypes: {
+      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+      spec: { tag: "spec", dir: ".", parent: "feature" },
+      task: { tag: "task", dir: ".", parent: "spec" },
+    },
+  },
+  files: {
+    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
+      title: "User authentication",
+      status: "new",
+      created_on: "2026-03-20",
+    },
+    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
+      parent: "1.feat.user-auth",
+      title: "Login flow",
+      status: "new",
+      created_on: "2026-03-20",
+    },
+    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
+      parent: "2.spec.login-flow",
+      title: "Add JWT middleware",
+      status: "done",
+      created_on: "2026-03-21",
+    },
+    "context/features/001.feat.user-auth/004.task.session-store.md": {
+      parent: "2.spec.login-flow",
+      title: "Session store",
+      status: "new",
+      created_on: "2026-03-21",
+    },
+  },
+} as const
 
 function setupMutableProject() {
-  const dir = workspace.copyFixture(FIXTURE_DIR)
+  const { dir, project } = testProject.setup(BASIC_SETUP)
   vi.spyOn(process, "cwd").mockReturnValue(dir)
-  vi.mocked(loadProjectFrom).mockReturnValue(
-    resolveProject(
-      { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
-      join(dir, ".pm.json"),
-    ),
-  )
+  vi.mocked(loadProjectFrom).mockReturnValue(project)
   return dir
 }
 
@@ -109,7 +135,6 @@ describe("current command", () => {
     const dir = setupMutableProject()
 
     // Write .pm.current directly with a non-existent ID
-    const { writeFileSync } = require("node:fs")
     writeFileSync(join(dir, ".pm.current"), "999\n")
 
     // Read current — should warn and clear

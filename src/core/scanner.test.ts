@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest"
-import { join } from "node:path"
 import {
   parseDocumentFilename,
   formatDocumentFilename,
@@ -10,6 +9,7 @@ import {
   getNextId,
 } from "./scanner.js"
 import { resolveProject } from "../lib/project.js"
+import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 
 // ---------------------------------------------------------------------------
 // Filename parsing
@@ -96,37 +96,56 @@ describe("parseDocumentRef", () => {
 })
 
 // ---------------------------------------------------------------------------
-// Scanner (uses real fixture files)
+// Scanner (uses declarative test project setup)
 // ---------------------------------------------------------------------------
 
-const FIXTURE_DIR = join(
-  import.meta.dirname,
-  "../../test/fixtures/basic-project",
-)
+const testProject = createTestProject("scanner")
 
-const FULL_DOCTYPES = {
-  feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-  spec: { tag: "spec", dir: ".", parent: "feature" },
-  task: { tag: "task", dir: ".", parent: "spec" },
-}
-
-function loadFixtureProject() {
-  return resolveProject(
-    { doctypes: FULL_DOCTYPES },
-    join(FIXTURE_DIR, ".pm.json"),
-  )
+const BASIC_SETUP: TestSetup = {
+  pmJson: {
+    doctypes: {
+      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+      spec: { tag: "spec", dir: ".", parent: "feature" },
+      task: { tag: "task", dir: ".", parent: "spec" },
+    },
+  },
+  files: {
+    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
+      title: "User authentication",
+      status: "new",
+      created_on: "2026-03-20",
+    },
+    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
+      parent: "1.feat.user-auth",
+      title: "Login flow",
+      status: "new",
+      created_on: "2026-03-20",
+    },
+    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
+      parent: "2.spec.login-flow",
+      title: "Add JWT middleware",
+      status: "done",
+      created_on: "2026-03-21",
+    },
+    "context/features/001.feat.user-auth/004.task.session-store.md": {
+      parent: "2.spec.login-flow",
+      title: "Session store",
+      status: "new",
+      created_on: "2026-03-21",
+    },
+  },
 }
 
 describe("scanDocuments", () => {
   it("yields all documents from fixture", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const docs = collectAllDocuments(project)
     const ids = docs.map((d) => d.id).sort((a, b) => a - b)
     expect(ids).toEqual([1, 2, 3, 4])
   })
 
   it("assigns correct tags", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const docs = collectAllDocuments(project)
     const byId = Object.fromEntries(docs.map((d) => [d.id, d]))
     expect(byId[1].tag).toBe("feat")
@@ -136,7 +155,7 @@ describe("scanDocuments", () => {
   })
 
   it("ignores non-document files", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const docs = collectAllDocuments(project)
     // Should only find .md files with valid {id}.{tag}.{slug}.md pattern
     for (const doc of docs) {
@@ -148,7 +167,7 @@ describe("scanDocuments", () => {
 
 describe("findDocumentById", () => {
   it("finds existing document", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     const doc = findDocumentById(project, 2)
     expect(doc).not.toBeNull()
     expect(doc!.tag).toBe("spec")
@@ -156,22 +175,24 @@ describe("findDocumentById", () => {
   })
 
   it("returns null for non-existent ID", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     expect(findDocumentById(project, 999)).toBeNull()
   })
 })
 
 describe("getNextId", () => {
   it("returns max + 1 from fixture", () => {
-    const project = loadFixtureProject()
+    const { project } = testProject.setup(BASIC_SETUP)
     expect(getNextId(project)).toBe(5)
   })
 
   it("returns 1 when no documents exist", () => {
-    const project = resolveProject(
-      { doctypes: { feature: { tag: "feat", dir: "nonexistent" } } },
-      join(FIXTURE_DIR, ".pm.json"),
-    )
+    const { project } = testProject.setup({
+      pmJson: {
+        doctypes: { feature: { tag: "feat", dir: "nonexistent" } },
+      },
+      files: {},
+    })
     expect(getNextId(project)).toBe(1)
   })
 })

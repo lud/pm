@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 import { join } from "node:path"
-import { readFileSync, existsSync } from "node:fs"
+import { readFileSync } from "node:fs"
 
 vi.mock("../lib/cli.js", async () => {
   const actual = (await vi.importActual("../lib/cli.js")) as Record<
@@ -15,31 +15,73 @@ vi.mock("../lib/cli.js", async () => {
   }
 })
 
-import { resolveProject, loadProjectFile } from "../lib/project.js"
+import { loadProjectFile } from "../lib/project.js"
 import { parseFrontmatter } from "../lib/frontmatter.js"
-import { createTestWorkspace } from "../lib/test-workspace.js"
+import { createTestProject } from "../lib/test-setup.js"
 import { buildTidyPlan, applyTidyPlan, type DocumentEntry } from "./tidy.js"
 import { collectAllDocuments } from "./scanner.js"
 
-const BASIC_FIXTURE = join(
-  import.meta.dirname,
-  "../../test/fixtures/basic-project",
-)
-const DUPE_FIXTURE = join(
-  import.meta.dirname,
-  "../../test/fixtures/tidy-duplicates",
-)
-
-const workspace = createTestWorkspace("tidy")
-
-function loadProject(fixtureDir: string) {
-  return loadProjectFile(join(fixtureDir, ".pm.json"))
+const BASIC_DOCTYPES = {
+  feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+  spec: { tag: "spec", dir: ".", parent: "feature" },
+  task: { tag: "task", dir: ".", parent: "spec" },
 }
 
-function loadMutableProject(fixtureDir: string) {
-  const dir = workspace.copyFixture(fixtureDir)
-  return loadProjectFile(join(dir, ".pm.json"))
+const BASIC_SETUP = {
+  pmJson: {
+    doctypes: BASIC_DOCTYPES,
+  },
+  files: {
+    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
+      title: "User authentication",
+      status: "new",
+    },
+    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
+      parent: "1.feat.user-auth",
+      title: "Login flow",
+      status: "new",
+    },
+    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
+      parent: "2.spec.login-flow",
+      title: "Add JWT middleware",
+      status: "done",
+    },
+    "context/features/001.feat.user-auth/004.task.session-store.md": {
+      parent: "2.spec.login-flow",
+      title: "Session store",
+      status: "new",
+    },
+  },
 }
+
+const DUPE_SETUP = {
+  pmJson: {
+    doctypes: BASIC_DOCTYPES,
+  },
+  files: {
+    "context/features/001.feat.auth/001.feat.auth.md": {
+      title: "Auth feature",
+      status: "new",
+    },
+    "context/features/001.feat.auth/002.spec.login.md": {
+      parent: "1.feat.auth",
+      title: "Login spec",
+      status: "new",
+    },
+    "context/features/001.feat.auth/002.spec.signup.md": {
+      parent: "1.feat.auth",
+      title: "Signup spec",
+      status: "new",
+    },
+    "context/features/001.feat.auth/003.task.form.md": {
+      parent: "2.spec.login",
+      title: "Build login form",
+      status: "new",
+    },
+  },
+}
+
+const testProject = createTestProject("tidy")
 
 function reloadProject(projectDir: string) {
   return loadProjectFile(join(projectDir, ".pm.json"))
@@ -51,7 +93,7 @@ function reloadProject(projectDir: string) {
 
 describe("buildTidyPlan on clean project", () => {
   it("reports no changes needed", async () => {
-    const project = loadProject(BASIC_FIXTURE)
+    const { project } = testProject.setup(BASIC_SETUP)
     const plan = await buildTidyPlan(project)
     expect(plan.duplicateGroups.size).toBe(0)
     expect(plan.orphans).toHaveLength(0)
@@ -60,7 +102,7 @@ describe("buildTidyPlan on clean project", () => {
   })
 
   it("has a mapping for every document", async () => {
-    const project = loadProject(BASIC_FIXTURE)
+    const { project } = testProject.setup(BASIC_SETUP)
     const plan = await buildTidyPlan(project)
     expect(plan.mappings).toHaveLength(4)
     for (const m of plan.mappings) {
@@ -76,16 +118,10 @@ describe("buildTidyPlan on clean project", () => {
 
 describe("buildTidyPlan with idMask change", () => {
   it("renames intermediate directories when repadding", async () => {
-    // Copy basic-project and use idMask "0" (single digit)
-    const dir = workspace.copyFixture(BASIC_FIXTURE)
-    const { writeFileSync } = require("node:fs")
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
-        idMask: "0",
-        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
-      }),
-    )
+    const { dir } = testProject.setup({
+      pmJson: { idMask: "0", doctypes: BASIC_DOCTYPES },
+      files: BASIC_SETUP.files,
+    })
 
     const project = reloadProject(dir)
     const plan = await buildTidyPlan(project)
@@ -119,15 +155,10 @@ describe("buildTidyPlan with idMask change", () => {
   })
 
   it("applies repadding end-to-end", async () => {
-    const dir = workspace.copyFixture(BASIC_FIXTURE)
-    const { writeFileSync } = require("node:fs")
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
-        idMask: "0",
-        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
-      }),
-    )
+    const { dir } = testProject.setup({
+      pmJson: { idMask: "0", doctypes: BASIC_DOCTYPES },
+      files: BASIC_SETUP.files,
+    })
 
     const project = reloadProject(dir)
     const plan = await buildTidyPlan(project)
@@ -162,7 +193,7 @@ describe("buildTidyPlan with idMask change", () => {
 
 describe("buildTidyPlan with duplicates", () => {
   it("detects duplicate IDs", async () => {
-    const project = loadProject(DUPE_FIXTURE)
+    const { project } = testProject.setup(DUPE_SETUP)
     const plan = await buildTidyPlan(project)
     expect(plan.duplicateGroups.size).toBe(1)
     expect(plan.duplicateGroups.has(2)).toBe(true)
@@ -175,7 +206,7 @@ describe("buildTidyPlan with duplicates", () => {
   })
 
   it("assigns a new ID to the second duplicate", async () => {
-    const project = loadProject(DUPE_FIXTURE)
+    const { project } = testProject.setup(DUPE_SETUP)
     const plan = await buildTidyPlan(project)
 
     const signupMapping = plan.mappings.find((m) => m.doc.slug === "signup")
@@ -185,7 +216,7 @@ describe("buildTidyPlan with duplicates", () => {
   })
 
   it("keeps the first duplicate's ID unchanged", async () => {
-    const project = loadProject(DUPE_FIXTURE)
+    const { project } = testProject.setup(DUPE_SETUP)
     const plan = await buildTidyPlan(project)
 
     const loginMapping = plan.mappings.find((m) => m.doc.slug === "login")
@@ -195,7 +226,7 @@ describe("buildTidyPlan with duplicates", () => {
   })
 
   it("auto-resolves child parent ref using slug hint", async () => {
-    const project = loadProject(DUPE_FIXTURE)
+    const { project } = testProject.setup(DUPE_SETUP)
     const plan = await buildTidyPlan(project)
 
     // Task 003 references "2.spec.login" — auto-resolves to login spec
@@ -205,7 +236,7 @@ describe("buildTidyPlan with duplicates", () => {
   })
 
   it("generates a move for the renamed duplicate", async () => {
-    const project = loadProject(DUPE_FIXTURE)
+    const { project } = testProject.setup(DUPE_SETUP)
     const plan = await buildTidyPlan(project)
 
     // signup gets new ID 4 → file should move to 004.spec.signup.md
@@ -223,58 +254,40 @@ describe("buildTidyPlan with duplicates", () => {
 
 describe("buildTidyPlan with orphans", () => {
   it("detects documents with required parent missing from frontmatter", async () => {
-    const dir = workspace.dir("missing-parent-fixture")
-    const { mkdirSync, writeFileSync } = require("node:fs")
-    const featDir = join(dir, "context", "features", "001.feat.test")
-    mkdirSync(featDir, { recursive: true })
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
-        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
-      }),
-    )
-    writeFileSync(
-      join(featDir, "001.feat.test.md"),
-      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
-    )
-    // Spec with no parent field at all — but spec requires a parent
-    writeFileSync(
-      join(featDir, "002.spec.no-parent.md"),
-      ["---", "title: Spec without parent", "status: new", "---", ""].join(
-        "\n",
-      ),
-    )
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test feature",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.no-parent.md": {
+          title: "Spec without parent",
+          status: "new",
+        },
+      },
+    })
 
-    const project = reloadProject(dir)
     const plan = await buildTidyPlan(project)
     expect(plan.orphans).toHaveLength(1)
     expect(plan.orphans[0].slug).toBe("no-parent")
   })
 
   it("does not relocate orphaned documents", async () => {
-    const dir = workspace.dir("orphan-no-relocate")
-    const { mkdirSync, writeFileSync } = require("node:fs")
-    const featDir = join(dir, "context", "features", "001.feat.test")
-    mkdirSync(featDir, { recursive: true })
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
-        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
-      }),
-    )
-    writeFileSync(
-      join(featDir, "001.feat.test.md"),
-      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
-    )
-    // Spec without parent — sits in the feature directory
-    writeFileSync(
-      join(featDir, "002.spec.no-parent.md"),
-      ["---", "title: Spec without parent", "status: new", "---", ""].join(
-        "\n",
-      ),
-    )
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test feature",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.no-parent.md": {
+          title: "Spec without parent",
+          status: "new",
+        },
+      },
+    })
 
-    const project = reloadProject(dir)
     const plan = await buildTidyPlan(project)
 
     // Should be an orphan
@@ -284,33 +297,21 @@ describe("buildTidyPlan with orphans", () => {
   })
 
   it("detects documents whose parent does not exist", async () => {
-    const dir = workspace.dir("orphan-fixture")
-    const { mkdirSync, writeFileSync } = require("node:fs")
-    const featDir = join(dir, "context", "features", "001.feat.test")
-    mkdirSync(featDir, { recursive: true })
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
-        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
-      }),
-    )
-    writeFileSync(
-      join(featDir, "001.feat.test.md"),
-      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
-    )
-    writeFileSync(
-      join(featDir, "002.spec.orphan.md"),
-      [
-        "---",
-        "parent: 999.feat.nonexistent",
-        "title: Orphan spec",
-        "status: new",
-        "---",
-        "",
-      ].join("\n"),
-    )
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test feature",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.orphan.md": {
+          parent: "999.feat.nonexistent",
+          title: "Orphan spec",
+          status: "new",
+        },
+      },
+    })
 
-    const project = reloadProject(dir)
     const plan = await buildTidyPlan(project)
     expect(plan.orphans).toHaveLength(1)
     expect(plan.orphans[0].slug).toBe("orphan")
@@ -323,29 +324,21 @@ describe("buildTidyPlan with orphans", () => {
 
 describe("buildTidyPlan with bare numeric parent refs", () => {
   it("expands a numeric parent to a full reference", async () => {
-    const dir = workspace.dir("bare-parent-fixture")
-    const { mkdirSync, writeFileSync } = require("node:fs")
-    const featDir = join(dir, "context", "features", "001.feat.test")
-    mkdirSync(featDir, { recursive: true })
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
-        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
-      }),
-    )
-    writeFileSync(
-      join(featDir, "001.feat.test.md"),
-      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
-    )
-    // Spec with bare numeric parent
-    writeFileSync(
-      join(featDir, "002.spec.login.md"),
-      ["---", "parent: 1", "title: Login spec", "status: new", "---", ""].join(
-        "\n",
-      ),
-    )
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test feature",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.login.md": {
+          parent: 1,
+          title: "Login spec",
+          status: "new",
+        },
+      },
+    })
 
-    const project = reloadProject(dir)
     const plan = await buildTidyPlan(project)
 
     expect(plan.edits).toHaveLength(1)
@@ -353,65 +346,47 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
   })
 
   it("does not edit a parent ref that is already a full reference", async () => {
-    const dir = workspace.dir("full-parent-fixture")
-    const { mkdirSync, writeFileSync } = require("node:fs")
-    const featDir = join(dir, "context", "features", "001.feat.test")
-    mkdirSync(featDir, { recursive: true })
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
-        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
-      }),
-    )
-    writeFileSync(
-      join(featDir, "001.feat.test.md"),
-      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
-    )
-    writeFileSync(
-      join(featDir, "002.spec.login.md"),
-      [
-        "---",
-        "parent: 1.feat.test",
-        "title: Login spec",
-        "status: new",
-        "---",
-        "",
-      ].join("\n"),
-    )
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test feature",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.login.md": {
+          parent: "1.feat.test",
+          title: "Login spec",
+          status: "new",
+        },
+      },
+    })
 
-    const project = reloadProject(dir)
     const plan = await buildTidyPlan(project)
 
     expect(plan.edits).toHaveLength(0)
   })
 
   it("applies bare parent fix end-to-end", async () => {
-    const dir = workspace.dir("bare-parent-apply")
-    const { mkdirSync, writeFileSync } = require("node:fs")
-    const featDir = join(dir, "context", "features", "001.feat.test")
-    mkdirSync(featDir, { recursive: true })
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
-        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
-      }),
-    )
-    writeFileSync(
-      join(featDir, "001.feat.test.md"),
-      ["---", "title: Test feature", "status: new", "---", ""].join("\n"),
-    )
-    writeFileSync(
-      join(featDir, "002.spec.login.md"),
-      ["---", "parent: 1", "title: Login spec", "status: new", "---", ""].join(
-        "\n",
-      ),
-    )
+    const { dir, project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test feature",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.login.md": {
+          parent: 1,
+          title: "Login spec",
+          status: "new",
+        },
+      },
+    })
 
-    const project = reloadProject(dir)
     const plan = await buildTidyPlan(project)
     applyTidyPlan(plan)
 
     // Verify the file was updated
+    const featDir = join(dir, "context", "features", "001.feat.test")
     const content = readFileSync(join(featDir, "002.spec.login.md"), "utf-8")
     const { data } = parseFrontmatter(content)
     expect(data.parent).toBe("1.feat.test")
@@ -429,57 +404,30 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
 
 describe("buildTidyPlan with ambiguous duplicate parent", () => {
   it("calls promptForParent when slug hint does not match", async () => {
-    const dir = workspace.dir("ambiguous-fixture")
-    const { mkdirSync, writeFileSync } = require("node:fs")
-    const featDir = join(dir, "context", "features", "001.feat.test")
-    mkdirSync(featDir, { recursive: true })
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
-        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
-      }),
-    )
-    writeFileSync(
-      join(featDir, "001.feat.test.md"),
-      ["---", "title: Test", "status: new", "---", ""].join("\n"),
-    )
-    // Two specs with same ID
-    writeFileSync(
-      join(featDir, "002.spec.alpha.md"),
-      [
-        "---",
-        "parent: 1.feat.test",
-        "title: Alpha",
-        "status: new",
-        "---",
-        "",
-      ].join("\n"),
-    )
-    writeFileSync(
-      join(featDir, "002.spec.beta.md"),
-      [
-        "---",
-        "parent: 1.feat.test",
-        "title: Beta",
-        "status: new",
-        "---",
-        "",
-      ].join("\n"),
-    )
-    // Child references "2.spec.gamma" — slug doesn't match either duplicate
-    writeFileSync(
-      join(featDir, "003.task.child.md"),
-      [
-        "---",
-        "parent: 2.spec.gamma",
-        "title: Child task",
-        "status: new",
-        "---",
-        "",
-      ].join("\n"),
-    )
-
-    const project = reloadProject(dir)
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.alpha.md": {
+          parent: "1.feat.test",
+          title: "Alpha",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.beta.md": {
+          parent: "1.feat.test",
+          title: "Beta",
+          status: "new",
+        },
+        "context/features/001.feat.test/003.task.child.md": {
+          parent: "2.spec.gamma",
+          title: "Child task",
+          status: "new",
+        },
+      },
+    })
 
     let promptCalled = false
     const mockPrompt = async (
@@ -509,12 +457,12 @@ describe("buildTidyPlan with ambiguous duplicate parent", () => {
 
 describe("applyTidyPlan", () => {
   it("renames duplicate files on disk", async () => {
-    const project = loadMutableProject(DUPE_FIXTURE)
+    const { dir, project } = testProject.setup(DUPE_SETUP)
     const plan = await buildTidyPlan(project)
     applyTidyPlan(plan)
 
     // Re-scan from project dir
-    const newProject = reloadProject(project.projectDir)
+    const newProject = reloadProject(dir)
     const newDocs = collectAllDocuments(newProject)
     const ids = newDocs.map((d) => d.id).sort((a, b) => a - b)
     expect(ids).toEqual([1, 2, 3, 4])
@@ -522,11 +470,11 @@ describe("applyTidyPlan", () => {
   })
 
   it("preserves file content after rename", async () => {
-    const project = loadMutableProject(DUPE_FIXTURE)
+    const { dir, project } = testProject.setup(DUPE_SETUP)
     const plan = await buildTidyPlan(project)
     applyTidyPlan(plan)
 
-    const newProject = reloadProject(project.projectDir)
+    const newProject = reloadProject(dir)
     const newDocs = collectAllDocuments(newProject)
     const signup = newDocs.find((d) => d.slug === "signup")
     expect(signup).toBeDefined()
@@ -538,57 +486,31 @@ describe("applyTidyPlan", () => {
   })
 
   it("updates parent refs when parent ID changes", async () => {
-    // Create a fixture where a child references the duplicate that will be renumbered
-    const dir = workspace.dir("apply-parent-update")
-    const { mkdirSync, writeFileSync } = require("node:fs")
-    const featDir = join(dir, "context", "features", "001.feat.test")
-    mkdirSync(featDir, { recursive: true })
-    writeFileSync(
-      join(dir, ".pm.json"),
-      JSON.stringify({
-        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
-      }),
-    )
-    writeFileSync(
-      join(featDir, "001.feat.test.md"),
-      ["---", "title: Test", "status: new", "---", ""].join("\n"),
-    )
-    writeFileSync(
-      join(featDir, "002.spec.alpha.md"),
-      [
-        "---",
-        "parent: 1.feat.test",
-        "title: Alpha",
-        "status: new",
-        "---",
-        "",
-      ].join("\n"),
-    )
-    writeFileSync(
-      join(featDir, "002.spec.beta.md"),
-      [
-        "---",
-        "parent: 1.feat.test",
-        "title: Beta",
-        "status: new",
-        "---",
-        "",
-      ].join("\n"),
-    )
-    // Child explicitly references beta (which will get a new ID)
-    writeFileSync(
-      join(featDir, "003.task.child.md"),
-      [
-        "---",
-        "parent: 2.spec.beta",
-        "title: Child",
-        "status: new",
-        "---",
-        "",
-      ].join("\n"),
-    )
+    const { dir, project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.alpha.md": {
+          parent: "1.feat.test",
+          title: "Alpha",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.beta.md": {
+          parent: "1.feat.test",
+          title: "Beta",
+          status: "new",
+        },
+        "context/features/001.feat.test/003.task.child.md": {
+          parent: "2.spec.beta",
+          title: "Child",
+          status: "new",
+        },
+      },
+    })
 
-    const project = reloadProject(dir)
     const plan = await buildTidyPlan(project)
 
     // Beta is second by path order, gets new ID 4
@@ -613,11 +535,11 @@ describe("applyTidyPlan", () => {
   })
 
   it("is idempotent — running twice produces no further changes", async () => {
-    const project = loadMutableProject(DUPE_FIXTURE)
+    const { dir, project } = testProject.setup(DUPE_SETUP)
     const plan1 = await buildTidyPlan(project)
     applyTidyPlan(plan1)
 
-    const newProject = reloadProject(project.projectDir)
+    const newProject = reloadProject(dir)
     const plan2 = await buildTidyPlan(newProject)
     expect(plan2.duplicateGroups.size).toBe(0)
     expect(plan2.edits).toHaveLength(0)
