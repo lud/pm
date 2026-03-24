@@ -10,7 +10,7 @@ import { parsePropertyFlags } from "../lib/properties.js"
 export const editCommand = command(
   {
     name: "edit",
-    parameters: ["<id>", "[properties...]"],
+    parameters: ["<id>"],
     flags: {
       parent: {
         type: String,
@@ -28,12 +28,6 @@ export const editCommand = command(
     const id = parseDocumentRef(argv._.id)
     if (id === null) {
       cli.abortError(`Invalid document ID: "${argv._.id}"`)
-    }
-
-    if (argv._.properties.length > 0) {
-      cli.abortError(
-        "Positional key:value properties are no longer supported. Use --set key:value",
-      )
     }
 
     let properties: Record<string, unknown>

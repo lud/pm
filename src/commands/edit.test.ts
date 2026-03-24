@@ -147,18 +147,6 @@ describe("edit command", () => {
     ).toThrow("Invalid --set format")
   })
 
-  it("aborts when positional properties are used", () => {
-    setupMutableProject()
-
-    expect(() =>
-      cli({ name: "pm", commands: [editCommand] }, undefined, [
-        "edit",
-        "1",
-        "status:done",
-      ]),
-    ).toThrow()
-  })
-
   it("aborts on invalid document ID", () => {
     setupMutableProject()
 
@@ -166,6 +154,7 @@ describe("edit command", () => {
       cli({ name: "pm", commands: [editCommand] }, undefined, [
         "edit",
         "abc",
+        "--set",
         "status:done",
       ]),
     ).toThrow("Invalid document ID")
