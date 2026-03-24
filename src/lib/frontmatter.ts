@@ -2,8 +2,10 @@ import * as yaml from "yaml"
 
 const FM_REGEX = /^---\n([\s\S]*?)---(\n|$)/
 
+export type FrontmatterData = Record<string, unknown>
+
 export function parseFrontmatter(content: string): {
-  data: Record<string, unknown>
+  data: FrontmatterData
   body: string
 } {
   const match = FM_REGEX.exec(content)

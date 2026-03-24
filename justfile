@@ -10,7 +10,7 @@ build:
   npm run build
 
 format:
-  biome check --fix
+  biome format --fix
 
 typecheck:
   npm run typecheck
@@ -30,4 +30,9 @@ release bump: check
 _git_status:
   git status
 
-check: format test-coverage build schema typecheck _git_status
+biome-check:
+  biome check
+biome-check-fix:
+  biome check --fix
+
+check: format test-coverage build schema biome-check typecheck _git_status

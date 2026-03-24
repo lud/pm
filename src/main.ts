@@ -8,6 +8,7 @@ import { infoCommand } from "./commands/info.js"
 import { initCommand } from "./commands/init.js"
 import { listCommand } from "./commands/list.js"
 import { newCommand } from "./commands/new.js"
+import { nextCommand } from "./commands/next.js"
 import { readCommand } from "./commands/read.js"
 import { showCommand } from "./commands/show.js"
 import { statusCommand } from "./commands/status.js"
@@ -25,6 +26,7 @@ const argv = cli({
     editCommand,
     doneCommand,
     blockedCommand,
+    nextCommand,
     showCommand,
     currentCommand,
     statusCommand,

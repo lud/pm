@@ -164,8 +164,33 @@ pm current 003                               # Set document 003 as current
    - `pm done <id>` when the work is complete.
    - `pm blocked <id>` if work cannot proceed (waiting on dependencies, input,
      etc.).
-5. **Move on**: look at siblings (`pm list -p <parent-id>`) or the parent
-   (`pm show <parent-id>`) to find next work.
+5. **Find next work**: run `pm next` to find the next workable document.
+
+### Finding next work
+
+```bash
+pm next                    # Find the next workable document
+pm next -v                 # Same, with verbose traversal log
+```
+
+`pm next` starts from the current document and traverses the hierarchy to find
+the next **leaf** document that is neither done nor blocked. It only returns
+leaf documents — documents with no children.
+
+The command does not change the current document — it only reports the result.
+Use `pm current <id>` to switch to it.
+
+If the next document (feature, spec or task) is not really actionable, use your judgement to find work. You may replicate part of the next-finder algorithm:
+
+1. Look at siblings of the current document (same parent, sorted by ID). Pick
+   the first available one.
+2. If no sibling is available, move up to the parent and look at *its* siblings.
+3. Drill down into its children (first available child,
+   recursively) if there are children, recursively, until a leaf is reached.
+4. Do not select done or blocked documents.
+
+Use `pm show <id>` (to see children and parents) or `pm list -p <id>` (to list
+direct children of a document), filtering out done and blocked documents.
 
 ## Tips for agents
 

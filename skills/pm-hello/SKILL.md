@@ -79,24 +79,20 @@ branch below.
 
 ## Step 3 — Find next work
 
-When the current document is done, blocked, or otherwise not actionable, traverse
-the hierarchy to find the next piece of work. The traversal skips both done and
-blocked documents:
+When the current document is done, blocked, or otherwise not actionable, use
+`pm next` to find the next workable document. It traverses the hierarchy
+starting from the current document, looking for the nearest available leaf
+(siblings first, then up to parent siblings, drilling down into children).
 
-1. **Children first.** Check if the current document has active children
-   (`pm show <id>`). If so, pick the first active child.
-2. **Siblings.** Look at the parent (`pm show <parent-id>`) to find sibling
-   documents that are active. If one exists, pick it.
-3. **Walk up.** If all siblings are done or blocked, move to the parent and
-   repeat from step 2 — check the parent's siblings via the grandparent, and
-   so on.
-4. **Root level.** At the top of the hierarchy, list active features
-   (`pm list -t feature`). If any exist, present them to the user and ask which
-   to work on.
-5. **All done.** If no active documents remain anywhere, congratulate the user.
+```bash
+pm next
+```
 
-When a new document is selected, set it as current with `pm current <id>` and go
+If `pm next` finds a document, set it as current with `pm current <id>` and go
 back to Step 2 to evaluate it.
+
+If `pm next` reports nothing left, congratulate the user — all work is done or
+blocked.
 
 ## Marking documents as done or blocked
 
