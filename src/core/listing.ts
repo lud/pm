@@ -1,23 +1,17 @@
 import { readFileSync } from "node:fs"
 import { parseFrontmatter } from "../lib/frontmatter.js"
-import type { ResolvedProject } from "../lib/project.js"
+import type { ResolvedProject, ResolvedDoctype } from "../lib/project.js"
 import type { PropertyFilter } from "../lib/properties.js"
-import { collectAllDocuments, type ScannedDocument } from "./scanner.js"
+import {
+  scanDocuments,
+  collectAllDocuments,
+  type ScannedDocument,
+} from "./scanner.js"
 import { extractParentId } from "./parent-ref.js"
-import type { DocumentInfo } from "./documents.js"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export type ListFilter = {
-  doctype?: string
-  parentId?: number
-  status?: string
-  propertyFilters?: PropertyFilter[]
-  active?: boolean
-  done?: boolean
-}
 
 export type ListEntry = {
   id: number
@@ -29,89 +23,153 @@ export type ListEntry = {
   status: string | undefined
 }
 
+export type ListOptions = {
+  doctype?: string
+  parentId?: number
+  status?: string
+  propertyFilters?: PropertyFilter[]
+  done?: boolean
+  blocked?: boolean
+  allStatuses?: boolean
+}
+
 export type StatusCount = {
   status: string
   count: number
   isDone: boolean
+  isBlocked: boolean
 }
 
 export type StatusSummary = {
   doctype: string
   active: number
+  blocked: number
   done: number
   statuses: StatusCount[]
 }
 
 // ---------------------------------------------------------------------------
-// List documents with filtering
+// Predicate-based list filtering
 // ---------------------------------------------------------------------------
+
+type Predicate = {
+  filter: (entry: ReaderResult) => boolean
+  requiresFrontmatter: boolean
+}
+
+type ReaderResult = {
+  doc: ScannedDocument
+  frontmatter?: Record<string, unknown>
+  status?: string
+  title?: string
+  parentId?: number | null
+}
+
+function classifyStatus(
+  status: string | undefined,
+  doctype: ResolvedDoctype,
+): "active" | "blocked" | "done" {
+  if (status !== undefined && doctype.doneStatuses.includes(status)) {
+    return "done"
+  }
+  if (status !== undefined && doctype.blockedStatuses.includes(status)) {
+    return "blocked"
+  }
+  return "active"
+}
+
+function buildPredicates(
+  project: ResolvedProject,
+  options: ListOptions,
+): Predicate[] {
+  const predicates: Predicate[] = []
+
+  if (options.doctype !== undefined) {
+    const dt = options.doctype
+    predicates.push({
+      filter: (r) => r.doc.doctype.name === dt,
+      requiresFrontmatter: false,
+    })
+  }
+
+  if (options.parentId !== undefined) {
+    const parentId = options.parentId
+    predicates.push({
+      filter: (r) => r.parentId === parentId,
+      requiresFrontmatter: true,
+    })
+  }
+
+  if (options.status !== undefined) {
+    const status = options.status
+    predicates.push({
+      filter: (r) => r.status === status,
+      requiresFrontmatter: true,
+    })
+  }
+
+  if (options.propertyFilters && options.propertyFilters.length > 0) {
+    const filters = options.propertyFilters
+    predicates.push({
+      filter: (r) => filters.every((f) => r.frontmatter![f.key] === f.value),
+      requiresFrontmatter: true,
+    })
+  }
+
+  // Status category filter (default: active only)
+  if (options.done) {
+    predicates.push({
+      filter: (r) => classifyStatus(r.status, r.doc.doctype) === "done",
+      requiresFrontmatter: true,
+    })
+  } else if (options.blocked) {
+    predicates.push({
+      filter: (r) => classifyStatus(r.status, r.doc.doctype) === "blocked",
+      requiresFrontmatter: true,
+    })
+  } else if (!options.allStatuses) {
+    // Default: active only
+    predicates.push({
+      filter: (r) => classifyStatus(r.status, r.doc.doctype) === "active",
+      requiresFrontmatter: true,
+    })
+  }
+
+  return predicates
+}
 
 export function listDocuments(
   project: ResolvedProject,
-  filter: ListFilter = {},
+  options: ListOptions = {},
 ): ListEntry[] {
-  const allDocs = collectAllDocuments(project)
+  const predicates = buildPredicates(project, options)
+  const needsFrontmatter = predicates.some((p) => p.requiresFrontmatter)
+  const filterFn = (r: ReaderResult) => predicates.every((p) => p.filter(r))
+
   const results: ListEntry[] = []
 
-  // If filtering by parentId (descendants), we need to build the descendant set
-  let descendantIds: Set<number> | null = null
-  if (filter.parentId !== undefined) {
-    descendantIds = findDescendantIds(allDocs, filter.parentId)
-  }
+  for (const doc of scanDocuments(project)) {
+    const result: ReaderResult = { doc }
 
-  for (const doc of allDocs) {
-    // Filter by doctype
-    if (filter.doctype !== undefined && doc.doctype.name !== filter.doctype) {
-      continue
+    if (needsFrontmatter) {
+      const content = readFileSync(doc.path, "utf-8")
+      const { data } = parseFrontmatter(content)
+      result.frontmatter = data
+      result.status = typeof data.status === "string" ? data.status : undefined
+      result.title = typeof data.title === "string" ? data.title : undefined
+      result.parentId = extractParentId(data.parent)
     }
 
-    // Filter by descendant of parent
-    if (descendantIds !== null && !descendantIds.has(doc.id)) {
-      continue
-    }
+    if (!filterFn(result)) continue
 
-    // Read frontmatter for status filtering
-    const content = readFileSync(doc.path, "utf-8")
-    const { data } = parseFrontmatter(content)
-    const status = typeof data.status === "string" ? data.status : undefined
-    const title = typeof data.title === "string" ? data.title : doc.slug
-
-    // Filter by exact status
-    if (filter.status !== undefined && status !== filter.status) {
-      continue
-    }
-
-    if (filter.propertyFilters && filter.propertyFilters.length > 0) {
-      let matches = true
-      for (const propertyFilter of filter.propertyFilters) {
-        if (data[propertyFilter.key] !== propertyFilter.value) {
-          matches = false
-          break
-        }
-      }
-      if (!matches) {
-        continue
-      }
-    }
-
-    // Filter by active/done
-    const isDone =
-      status !== undefined && doc.doctype.doneStatuses.includes(status)
-
-    const showBoth = filter.active && filter.done
-    if (!showBoth) {
-      if (filter.active && isDone) continue
-      if (filter.done && !isDone) continue
-
-      // Default: show active only (when no explicit status filter)
-      if (
-        filter.status === undefined &&
-        !filter.active &&
-        !filter.done &&
-        isDone
-      ) {
-        continue
-      }
+    // If we didn't read frontmatter yet (all predicates were metadata-only),
+    // read it now for the output fields
+    if (!needsFrontmatter) {
+      const content = readFileSync(doc.path, "utf-8")
+      const { data } = parseFrontmatter(content)
+      result.frontmatter = data
+      result.status = typeof data.status === "string" ? data.status : undefined
+      result.title = typeof data.title === "string" ? data.title : undefined
     }
 
     results.push({
@@ -120,8 +178,8 @@ export function listDocuments(
       slug: doc.slug,
       path: doc.path,
       doctypeName: doc.doctype.name,
-      title,
-      status,
+      title: result.title ?? doc.slug,
+      status: result.status,
     })
   }
 
@@ -140,8 +198,10 @@ export function getStatusSummary(project: ResolvedProject): StatusSummary[] {
     string,
     {
       active: number
+      blocked: number
       done: number
       doneStatuses: string[]
+      blockedStatuses: string[]
       statusCounts: Map<string, number>
     }
   >()
@@ -150,18 +210,24 @@ export function getStatusSummary(project: ResolvedProject): StatusSummary[] {
     const content = readFileSync(doc.path, "utf-8")
     const { data } = parseFrontmatter(content)
     const status = typeof data.status === "string" ? data.status : "(none)"
-    const isDone =
-      status !== "(none)" && doc.doctype.doneStatuses.includes(status)
+    const category = classifyStatus(
+      status === "(none)" ? undefined : status,
+      doc.doctype,
+    )
 
     const entry = doctypeData.get(doc.doctype.name) ?? {
       active: 0,
+      blocked: 0,
       done: 0,
       doneStatuses: doc.doctype.doneStatuses,
+      blockedStatuses: doc.doctype.blockedStatuses,
       statusCounts: new Map(),
     }
 
-    if (isDone) {
+    if (category === "done") {
       entry.done++
+    } else if (category === "blocked") {
+      entry.blocked++
     } else {
       entry.active++
     }
@@ -170,62 +236,35 @@ export function getStatusSummary(project: ResolvedProject): StatusSummary[] {
   }
 
   return Array.from(doctypeData.entries()).map(
-    ([doctype, { active, done, doneStatuses, statusCounts }]) => {
+    ([
+      doctype,
+      { active, blocked, done, doneStatuses, blockedStatuses, statusCounts },
+    ]) => {
       const statuses = Array.from(statusCounts.entries()).map(
         ([status, count]) => ({
           status,
           count,
           isDone: doneStatuses.includes(status),
+          isBlocked: blockedStatuses.includes(status),
         }),
       )
 
-      // Non-terminal alphabetically, then terminal alphabetically
-      statuses.sort((a, b) => {
-        if (a.isDone !== b.isDone) return a.isDone ? 1 : -1
-        return a.status.localeCompare(b.status)
-      })
+      // Sort: active alphabetically, then blocked alphabetically, then done alphabetically
+      const activeStatuses = statuses.filter((s) => !s.isDone && !s.isBlocked)
+      const blockedStatusList = statuses.filter((s) => s.isBlocked)
+      const doneStatusList = statuses.filter((s) => s.isDone)
 
-      return { doctype, active, done, statuses }
+      activeStatuses.sort((a, b) => a.status.localeCompare(b.status))
+      blockedStatusList.sort((a, b) => a.status.localeCompare(b.status))
+      doneStatusList.sort((a, b) => a.status.localeCompare(b.status))
+
+      const sortedStatuses = [
+        ...activeStatuses,
+        ...blockedStatusList,
+        ...doneStatusList,
+      ]
+
+      return { doctype, active, blocked, done, statuses: sortedStatuses }
     },
   )
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Find all descendant IDs of a given parent document.
- * Builds a parent map from frontmatter, then walks the tree.
- */
-function findDescendantIds(
-  allDocs: ScannedDocument[],
-  parentId: number,
-): Set<number> {
-  // Build parent -> children map
-  const childrenOf = new Map<number, number[]>()
-
-  for (const doc of allDocs) {
-    const content = readFileSync(doc.path, "utf-8")
-    const { data } = parseFrontmatter(content)
-    const parentId = extractParentId(data.parent)
-    if (parentId !== null) {
-      const children = childrenOf.get(parentId) ?? []
-      children.push(doc.id)
-      childrenOf.set(parentId, children)
-    }
-  }
-
-  // BFS from parentId
-  const descendants = new Set<number>()
-  const queue = childrenOf.get(parentId) ?? []
-  while (queue.length > 0) {
-    const id = queue.shift()!
-    if (descendants.has(id)) continue
-    descendants.add(id)
-    const children = childrenOf.get(id) ?? []
-    queue.push(...children)
-  }
-
-  return descendants
 }

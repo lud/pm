@@ -283,6 +283,31 @@ export function markDone(project: ResolvedProject, id: number): DocumentInfo {
 }
 
 // ---------------------------------------------------------------------------
+// Mark document as blocked
+// ---------------------------------------------------------------------------
+
+export function markBlocked(
+  project: ResolvedProject,
+  id: number,
+): DocumentInfo {
+  const doc = readDocument(project, id)
+  if (!doc) {
+    throw new Error(`Document ${id} not found`)
+  }
+
+  const blockedStatus = doc.doctype.blockedStatuses[0]
+  if (!blockedStatus) {
+    throw new Error(
+      `Doctype "${doc.doctype.name}" has no blocked statuses defined`,
+    )
+  }
+
+  return editDocument(project, id, {
+    setProperties: { status: blockedStatus },
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

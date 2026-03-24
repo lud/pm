@@ -36,16 +36,26 @@ in the file explorer. Using such padding is helpful to the user.
 
 The default doctypes are:
 
-| Doctype   | Tag    | Parent    | Done statuses | Creates directory |
-| --------- | ------ | --------- | ------------- | ----------------- |
-| `feature` | `feat` | (none)    | `done`        | yes               |
-| `spec`    | `spec` | `feature` | `done`        | no                |
-| `task`    | `task` | `spec`    | `done`        | no                |
+| Doctype   | Tag    | Parent    | Blocked statuses | Done statuses | Creates directory |
+| --------- | ------ | --------- | ---------------- | ------------- | ----------------- |
+| `feature` | `feat` | (none)    | `blocked`        | `done`        | yes               |
+| `spec`    | `spec` | `feature` | `blocked`        | `done`        | no                |
+| `task`    | `task` | `spec`    | `blocked`        | `done`        | no                |
 
 The hierarchy is: **feature → spec → task**. A spec belongs to a feature, a task
 belongs to a spec.
 
 Users can configure additional doctypes or remove defaults in `.pm.json`.
+
+### Status categories
+
+Each document status falls into one of three categories:
+
+- **Active** — not in `doneStatuses` or `blockedStatuses`. This is work that can
+  be acted on.
+- **Blocked** — in the doctype's `blockedStatuses`. Work that cannot proceed
+  right now.
+- **Done** — in the doctype's `doneStatuses`. Work that is complete.
 
 ### Frontmatter
 
@@ -64,8 +74,8 @@ created_on: 2026-03-23
   also accepts a numeric ID alone as a shorthand when editing manually. Omitted
   for root documents.
 - `title` — human-readable title.
-- `status` — free-form string. Each doctype defines "done statuses" that mark
-  work as complete.
+- `status` — free-form string. Each doctype defines "done statuses" and
+  "blocked statuses" that classify the document.
 - The document **ID is not in the frontmatter** — it comes from the filename.
 
 ### Directory layout
@@ -103,13 +113,15 @@ pm init                    # Create .pm.json in current directory
 ### Querying
 
 ```bash
-pm info                    # Show project config: doctypes, hierarchy, done statuses
+pm info                    # Show project config: doctypes, hierarchy, statuses
 pm status                  # Counts per doctype + current document details
-pm list                    # List all active documents
+pm list                    # List active documents (default: not done, not blocked)
 pm list -t task            # List active tasks only
-pm list --done             # List done documents
-pm list -p 001             # List descendants of document 001
-pm list --status blocked --is owner:alice  # Filter by status and custom property
+pm list --done             # List done documents only
+pm list --blocked          # List blocked documents only
+pm list -S                 # List all documents regardless of status
+pm list -p 001             # List direct children of document 001
+pm list --status waiting --is owner:alice  # Filter by exact status and property
 pm list --is priority:2    # Filter by numeric custom property
 pm show 003                # Show document 003 with parents and children
 pm read 003                # Print full file contents of document 003
@@ -135,10 +147,10 @@ from the title (lowercased, spaces become hyphens).
 
 ```bash
 pm edit 003 --set status:in-progress         # Set status
-pm edit 003 --set status:blocked --set reason:"waiting on API"  # Set multiple properties
-pm edit 003 --set status:urgent              # Set a custom status value
+pm edit 003 --set status:waiting --set reason:"waiting on API"  # Set multiple properties
 pm edit 003 -p 002                           # Set/change parent
 pm done 003                                  # Mark as done (first done status)
+pm blocked 003                               # Mark as blocked (first blocked status)
 pm current 003                               # Set document 003 as current
 ```
 
@@ -148,7 +160,10 @@ pm current 003                               # Set document 003 as current
 2. **Check the current document**: read it with `pm read <id>`, understand the
    context.
 3. **Do the work**: implement, write, review — whatever the document describes.
-4. **Mark done**: `pm done <id>` when the work is complete.
+4. **Mark done or blocked**:
+   - `pm done <id>` when the work is complete.
+   - `pm blocked <id>` if work cannot proceed (waiting on dependencies, input,
+     etc.).
 5. **Move on**: look at siblings (`pm list -p <parent-id>`) or the parent
    (`pm show <parent-id>`) to find next work.
 
@@ -165,6 +180,8 @@ pm current 003                               # Set document 003 as current
 - Statuses are free-form. Set them on create with `pm new ... -s <status>` or
   with `pm new ... --set status:<status>`, and update them with
   `pm edit <id> --set status:<status>`.
+- Use `pm done <id>` and `pm blocked <id>` to set status via the doctype's
+  configured done/blocked statuses. Use `pm edit` for any other status value.
 - Common statuses: `new`, `in-progress`, `blocked`, `specified` (for specs,
   active), `done`.
 - The `--help` flag on any command shows all available options.

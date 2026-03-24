@@ -45,6 +45,15 @@
               "type": "string"
             }
           },
+          "blockedStatuses": {
+            "default": [
+              "blocked"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "defaultStatus": {
             "default": "new",
             "type": "string"

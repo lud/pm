@@ -1,8 +1,7 @@
 import { command } from "cleye"
 import { loadProjectFrom } from "../lib/project.js"
-import { listDocuments, type ListFilter } from "../core/listing.js"
+import { listDocuments, type ListOptions } from "../core/listing.js"
 import { parseDocumentRef } from "../core/scanner.js"
-import { formatPath } from "../lib/format.js"
 import * as cli from "../lib/cli.js"
 import { parsePropertyFilters } from "../lib/properties.js"
 
@@ -20,14 +19,20 @@ export const listCommand = command(
         alias: "p",
         description: "Filter to descendants of this document ID",
       },
-      active: {
-        type: Boolean,
-        description: "Show active documents (default)",
-        default: false,
-      },
       done: {
         type: Boolean,
-        description: "Show done documents",
+        description: "Show done documents only",
+        default: false,
+      },
+      blocked: {
+        type: Boolean,
+        description: "Show blocked documents only",
+        default: false,
+      },
+      allStatuses: {
+        type: Boolean,
+        alias: "S",
+        description: "Show all documents regardless of status",
         default: false,
       },
       status: {
@@ -43,13 +48,13 @@ export const listCommand = command(
   (argv) => {
     const project = loadProjectFrom(process.cwd())
 
-    const filter: ListFilter = {}
+    const options: ListOptions = {}
 
     if (argv.flags.type) {
       if (!(argv.flags.type in project.doctypes)) {
         cli.abortError(`Unknown doctype: "${argv.flags.type}"`)
       }
-      filter.doctype = argv.flags.type
+      options.doctype = argv.flags.type
     }
 
     if (argv.flags.parent) {
@@ -57,26 +62,28 @@ export const listCommand = command(
       if (parentId === null) {
         cli.abortError(`Invalid parent ID: "${argv.flags.parent}"`)
       }
-      filter.parentId = parentId
+      options.parentId = parentId
     }
 
     if (argv.flags.status) {
-      filter.status = argv.flags.status
+      options.status = argv.flags.status
+      options.allStatuses = true
     }
 
     try {
       const propertyFilters = parsePropertyFilters(argv.flags.is, "--is")
       if (propertyFilters.length > 0) {
-        filter.propertyFilters = propertyFilters
+        options.propertyFilters = propertyFilters
       }
     } catch (err) {
       cli.abortError((err as Error).message)
     }
 
-    if (argv.flags.active) filter.active = true
-    if (argv.flags.done) filter.done = true
+    if (argv.flags.done) options.done = true
+    if (argv.flags.blocked) options.blocked = true
+    if (argv.flags.allStatuses) options.allStatuses = true
 
-    const entries = listDocuments(project, filter)
+    const entries = listDocuments(project, options)
 
     for (const entry of entries) {
       const statusStr = entry.status ? ` (${entry.status})` : ""

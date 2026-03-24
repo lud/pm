@@ -112,9 +112,9 @@ describe("listDocuments", () => {
     expect(ids).toEqual([3])
   })
 
-  it("lists all documents with --active and --done", () => {
+  it("lists all documents with --all-statuses", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const entries = listDocuments(project, { active: true, done: true })
+    const entries = listDocuments(project, { allStatuses: true })
     expect(entries).toHaveLength(4)
   })
 
@@ -122,8 +122,7 @@ describe("listDocuments", () => {
     const { project } = testProject.setup(BASIC_SETUP)
     const entries = listDocuments(project, {
       doctype: "task",
-      active: true,
-      done: true,
+      allStatuses: true,
     })
     const ids = entries.map((e) => e.id).sort((a, b) => a - b)
     expect(ids).toEqual([3, 4])
@@ -131,30 +130,31 @@ describe("listDocuments", () => {
 
   it("filters by exact status", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const entries = listDocuments(project, { status: "done" })
+    const entries = listDocuments(project, {
+      status: "done",
+      allStatuses: true,
+    })
     expect(entries).toHaveLength(1)
     expect(entries[0].id).toBe(3)
   })
 
-  it("filters by parent (descendants)", () => {
+  it("filters by direct parent", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    // Descendants of feature 1: spec 2, task 3, task 4
+    // Direct children of feature 1: spec 2
     const entries = listDocuments(project, {
       parentId: 1,
-      active: true,
-      done: true,
+      allStatuses: true,
     })
     const ids = entries.map((e) => e.id).sort((a, b) => a - b)
-    expect(ids).toEqual([2, 3, 4])
+    expect(ids).toEqual([2])
   })
 
-  it("filters descendants of spec (only direct and indirect children)", () => {
+  it("filters direct children of spec", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    // Descendants of spec 2: task 3, task 4
+    // Direct children of spec 2: task 3, task 4
     const entries = listDocuments(project, {
       parentId: 2,
-      active: true,
-      done: true,
+      allStatuses: true,
     })
     const ids = entries.map((e) => e.id).sort((a, b) => a - b)
     expect(ids).toEqual([3, 4])
@@ -164,15 +164,14 @@ describe("listDocuments", () => {
     const { project } = testProject.setup(BASIC_SETUP)
     const entries = listDocuments(project, {
       parentId: 3,
-      active: true,
-      done: true,
+      allStatuses: true,
     })
     expect(entries).toHaveLength(0)
   })
 
   it("includes title from frontmatter", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const entries = listDocuments(project, { active: true, done: true })
+    const entries = listDocuments(project, { allStatuses: true })
     const feat = entries.find((e) => e.id === 1)
     expect(feat!.title).toBe("User authentication")
   })
@@ -199,8 +198,7 @@ describe("listDocuments", () => {
         { key: "priority", value: 2 },
         { key: "blocked", value: false },
       ],
-      active: true,
-      done: true,
+      allStatuses: true,
     })
 
     const ids = entries.map((e) => e.id)
@@ -214,8 +212,7 @@ describe("listDocuments", () => {
         { key: "status", value: "new" },
         { key: "status", value: "done" },
       ],
-      active: true,
-      done: true,
+      allStatuses: true,
     })
     expect(entries).toHaveLength(0)
   })
@@ -239,7 +236,7 @@ describe("listDocuments", () => {
       },
     })
 
-    const entries = listDocuments(project, { active: true, done: true })
+    const entries = listDocuments(project, { allStatuses: true })
     const ids = entries.map((e) => e.id)
     // Should be sorted by numeric ID, not filesystem order
     expect(ids).toEqual([2, 10])
@@ -258,10 +255,13 @@ describe("getStatusSummary", () => {
     const byDoctype = Object.fromEntries(summary.map((s) => [s.doctype, s]))
     expect(byDoctype.feature.active).toBe(1)
     expect(byDoctype.feature.done).toBe(0)
+    expect(byDoctype.feature.blocked).toBe(0)
     expect(byDoctype.spec.active).toBe(1)
     expect(byDoctype.spec.done).toBe(0)
+    expect(byDoctype.spec.blocked).toBe(0)
     expect(byDoctype.task.active).toBe(1)
     expect(byDoctype.task.done).toBe(1)
+    expect(byDoctype.task.blocked).toBe(0)
   })
 
   it("includes per-status counts", () => {
@@ -272,10 +272,20 @@ describe("getStatusSummary", () => {
     expect(tasks.statuses).toHaveLength(2)
 
     const newStatus = tasks.statuses.find((s) => s.status === "new")
-    expect(newStatus).toEqual({ status: "new", count: 1, isDone: false })
+    expect(newStatus).toEqual({
+      status: "new",
+      count: 1,
+      isDone: false,
+      isBlocked: false,
+    })
 
     const doneStatus = tasks.statuses.find((s) => s.status === "done")
-    expect(doneStatus).toEqual({ status: "done", count: 1, isDone: true })
+    expect(doneStatus).toEqual({
+      status: "done",
+      count: 1,
+      isDone: true,
+      isBlocked: false,
+    })
   })
 
   it("sorts non-terminal statuses before terminal statuses", () => {

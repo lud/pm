@@ -23,6 +23,7 @@ const DEFAULT_CONFIG = {
       requireParent: true,
       intermediateDir: true,
       doneStatuses: ["done"],
+      blockedStatuses: ["blocked"],
       defaultStatus: "new",
     },
     spec: {
@@ -32,6 +33,7 @@ const DEFAULT_CONFIG = {
       requireParent: true,
       intermediateDir: false,
       doneStatuses: ["done"],
+      blockedStatuses: ["blocked"],
       defaultStatus: "new",
     },
     task: {
@@ -41,6 +43,7 @@ const DEFAULT_CONFIG = {
       requireParent: true,
       intermediateDir: false,
       doneStatuses: ["done"],
+      blockedStatuses: ["blocked"],
       defaultStatus: "new",
     },
   },

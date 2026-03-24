@@ -9,6 +9,7 @@ import {
   createDocument,
   editDocument,
   markDone,
+  markBlocked,
 } from "./documents.js"
 
 const testProject = createTestProject("documents")
@@ -396,5 +397,43 @@ describe("markDone", () => {
   it("throws for non-existent document", () => {
     const { project } = testProject.setup(BASIC_SETUP)
     expect(() => markDone(project, 999)).toThrow(/not found/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// markBlocked
+// ---------------------------------------------------------------------------
+
+describe("markBlocked", () => {
+  it("sets status to first blockedStatus", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    const doc = markBlocked(project, 1)
+    expect(doc.frontmatter.status).toBe("blocked")
+  })
+
+  it("throws for non-existent document", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    expect(() => markBlocked(project, 999)).toThrow(/not found/)
+  })
+
+  it("throws when blockedStatuses is empty", () => {
+    const { project } = testProject.setup({
+      pmJson: {
+        doctypes: {
+          feature: {
+            tag: "feat",
+            dir: "features",
+            blockedStatuses: [],
+          },
+        },
+      },
+      files: {
+        "features/001.feat.test/001.feat.test.md": {
+          title: "Test feature",
+          status: "new",
+        },
+      },
+    })
+    expect(() => markBlocked(project, 1)).toThrow(/no blocked statuses/)
   })
 })

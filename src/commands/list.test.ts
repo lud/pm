@@ -195,8 +195,7 @@ describe("list command", () => {
       "priority:2",
       "--is",
       "blocked:false",
-      "--active",
-      "--done",
+      "-S",
     ])
 
     const lines = infoLines()

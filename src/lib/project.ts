@@ -15,6 +15,7 @@ const DoctypeSchema = z.object({
   requireParent: z.boolean().default(true),
   intermediateDir: z.boolean().default(false),
   doneStatuses: z.array(z.string()).default(["done"]),
+  blockedStatuses: z.array(z.string()).default(["blocked"]),
   defaultStatus: z.string().default("new"),
 })
 

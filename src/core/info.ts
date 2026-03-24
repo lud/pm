@@ -1,14 +1,6 @@
 import table from "text-table"
 import type { ResolvedProject, ResolvedDoctype } from "../lib/project.js"
 
-export type InfoRow = {
-  name: string
-  tag: string
-  parent: string
-  dir: string
-  doneStatuses: string
-}
-
 function formatDir(dt: ResolvedDoctype): string {
   if (dt.dir === ".") {
     return "(parent dir)"
@@ -37,17 +29,25 @@ export function getProjectInfo(project: ResolvedProject): string {
     return a.name.localeCompare(b.name)
   })
 
-  const header = ["NAME", "TAG", "PARENT", "DIR", "DONE STATUSES"]
+  const header = [
+    "NAME",
+    "TAG",
+    "PARENT",
+    "DIR",
+    "BLOCKED STATUSES",
+    "DONE STATUSES",
+  ]
   const rows = doctypes.map((dt) => [
     dt.name,
     dt.tag,
     formatParent(dt),
     formatDir(dt),
+    dt.blockedStatuses.join(", "),
     dt.doneStatuses.join(", "),
   ])
 
   return table([header, ...rows], {
-    align: ["l", "l", "l", "l", "l"],
+    align: ["l", "l", "l", "l", "l", "l"],
     hsep: "  ",
   })
 }
