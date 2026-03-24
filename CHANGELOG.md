@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-03-24
+
+### 🚀 Features
+
+- Allow setting and filtering by custom properties
+- Done status for spec is now 'done'
+- Remove support for positional property edits
+
 ## [0.4.0] - 2026-03-23
 
 ### 🚀 Features
