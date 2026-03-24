@@ -67,7 +67,7 @@ describe("default command", () => {
     vi.mocked(tryLocateProjectFile).mockReturnValue(pmJson)
     vi.mocked(loadProjectFile).mockReturnValue(
       resolveProject(
-        { doctypes: { feature: { dir: "context/features" } } },
+        { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
         pmJson,
       ),
     )

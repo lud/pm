@@ -4,7 +4,6 @@ import {
   resolveProject,
   locateProjectFile,
   loadProjectFile,
-  DEFAULT_DOCTYPES,
 } from "./project.js"
 import { createTestWorkspace } from "./test-workspace.js"
 
@@ -28,54 +27,33 @@ function resolve(
   return resolveProject(rawConfig, `${projectDir}/.pm.json`)
 }
 
+const FULL_DOCTYPES = {
+  feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+  spec: { tag: "spec", dir: ".", parent: "feature" },
+  task: { tag: "task", dir: ".", parent: "spec" },
+}
+
 describe("resolveProject", () => {
-  describe("default doctypes", () => {
-    it("provides feature, spec, and task by default", () => {
-      const project = resolve({ doctypes: { feature: { dir: "features" } } })
-      expect(Object.keys(project.doctypes)).toContain("feature")
-      expect(Object.keys(project.doctypes)).toContain("spec")
-      expect(Object.keys(project.doctypes)).toContain("task")
-    })
-
-    it("merges user config on top of defaults", () => {
+  describe("no default doctypes", () => {
+    it("uses only explicitly defined doctypes", () => {
       const project = resolve({
         doctypes: {
-          feature: { dir: "my-features" },
+          feature: { tag: "feat", dir: "features" },
         },
       })
-      // User's dir overrides, but default tag/intermediateDir are preserved
-      expect(project.doctypes.feature.dir).toBe("my-features")
-      expect(project.doctypes.feature.tag).toBe("feat")
-      expect(project.doctypes.feature.intermediateDir).toBe(true)
+      expect(Object.keys(project.doctypes)).toEqual(["feature"])
     })
 
-    it("allows overriding default doneStatuses", () => {
-      const project = resolve({
-        doctypes: {
-          feature: { dir: "features" },
-          spec: { doneStatuses: ["done", "specified"] },
-        },
-      })
-      expect(project.doctypes.spec.doneStatuses).toEqual(["done", "specified"])
-    })
-
-    it("removes a default doctype when set to null", () => {
-      const project = resolve({
-        doctypes: {
-          feature: { dir: "features" },
-          task: null as unknown,
-        },
-      })
-      expect(project.doctypes.feature).toBeDefined()
-      expect(project.doctypes.spec).toBeDefined()
-      expect(project.doctypes.task).toBeUndefined()
+    it("empty doctypes yields empty project", () => {
+      const project = resolve({ doctypes: {} })
+      expect(Object.keys(project.doctypes)).toEqual([])
     })
   })
 
   describe("path resolution", () => {
     it("resolves dir to absolute path from projectDir", () => {
       const project = resolve(
-        { doctypes: { feature: { dir: "context/features" } } },
+        { doctypes: { feature: { tag: "feat", dir: "context/features" } } },
         "/home/user/myproject",
       )
       expect(project.projectDir).toBe("/home/user/myproject")
@@ -86,10 +64,14 @@ describe("resolveProject", () => {
 
     it("resolves '.' dir relative to projectDir", () => {
       const project = resolve(
-        { doctypes: { feature: { dir: "features" } } },
+        {
+          doctypes: {
+            feature: { tag: "feat", dir: "features" },
+            spec: { tag: "spec", dir: ".", parent: "feature" },
+          },
+        },
         "/home/user/myproject",
       )
-      // spec has dir "." by default — join("/home/user/myproject", ".") = "/home/user/myproject"
       expect(project.doctypes.spec.absDir).toBe("/home/user/myproject")
     })
   })
@@ -98,7 +80,7 @@ describe("resolveProject", () => {
     it("strips $schema from config", () => {
       const project = resolve({
         $schema: "https://example.com/schema.json",
-        doctypes: { feature: { dir: "features" } },
+        doctypes: { feature: { tag: "feat", dir: "features" } },
       })
       // Should not throw, $schema is ignored
       expect(project.doctypes.feature).toBeDefined()
@@ -110,7 +92,7 @@ describe("resolveProject", () => {
       expect(() =>
         resolve({
           doctypes: {
-            feature: { dir: "features" },
+            feature: { tag: "feat", dir: "features" },
             custom: { tag: "feat", dir: "custom" },
           },
         }),
@@ -121,9 +103,7 @@ describe("resolveProject", () => {
       expect(() =>
         resolve({
           doctypes: {
-            feature: { dir: "features" },
-            spec: null as unknown,
-            task: null as unknown,
+            feature: { tag: "feat", dir: "features" },
             custom: { tag: "cust", dir: ".", parent: "nonexistent" },
           },
         }),
@@ -134,9 +114,6 @@ describe("resolveProject", () => {
       expect(() =>
         resolve({
           doctypes: {
-            feature: null as unknown,
-            spec: null as unknown,
-            task: null as unknown,
             a: { tag: "aa", dir: "a", parent: "b" },
             b: { tag: "bb", dir: "b", parent: "a" },
           },
@@ -148,7 +125,7 @@ describe("resolveProject", () => {
       expect(() =>
         resolve({
           doctypes: {
-            feature: { dir: "/absolute/path" },
+            feature: { tag: "feat", dir: "/absolute/path" },
           },
         }),
       ).toThrow(/dir must be relative/)
@@ -158,36 +135,25 @@ describe("resolveProject", () => {
       expect(() =>
         resolve({
           doctypes: {
-            feature: { dir: "../escape" },
+            feature: { tag: "feat", dir: "../escape" },
           },
         }),
       ).toThrow(/must not contain "\.\."/)
     })
-
-    it("rejects doctype without dir when no default provides it", () => {
-      // feature has no default dir — user must provide one
-      expect(() =>
-        resolve({
-          doctypes: {},
-        }),
-      ).toThrow(/missing required field "dir"/)
-    })
   })
 
   describe("custom doctypes", () => {
-    it("supports user-defined doctypes alongside defaults", () => {
+    it("supports user-defined doctypes", () => {
       const project = resolve({
         doctypes: {
-          feature: { dir: "features" },
+          feature: { tag: "feat", dir: "features" },
           note: { tag: "note", dir: "notes" },
         },
       })
       expect(project.doctypes.note).toBeDefined()
       expect(project.doctypes.note.tag).toBe("note")
       expect(project.doctypes.note.absDir).toBe("/test/project/notes")
-      // Defaults still present
       expect(project.doctypes.feature).toBeDefined()
-      expect(project.doctypes.spec).toBeDefined()
     })
   })
 
@@ -195,7 +161,6 @@ describe("resolveProject", () => {
     it("applies default doneStatuses", () => {
       const project = resolve({
         doctypes: {
-          feature: { dir: "features" },
           custom: { tag: "cust", dir: "stuff" },
         },
       })
@@ -205,7 +170,6 @@ describe("resolveProject", () => {
     it("applies default status", () => {
       const project = resolve({
         doctypes: {
-          feature: { dir: "features" },
           custom: { tag: "cust", dir: "stuff" },
         },
       })
@@ -215,10 +179,10 @@ describe("resolveProject", () => {
     it("applies requireParent default", () => {
       const project = resolve({
         doctypes: {
-          feature: { dir: "features" },
+          feature: { tag: "feat", dir: "features" },
         },
       })
-      expect(project.doctypes.spec.requireParent).toBe(true)
+      expect(project.doctypes.feature.requireParent).toBe(true)
     })
   })
 })
@@ -245,9 +209,6 @@ describe("locateProjectFile", () => {
   })
 
   it("aborts when .pm.json is not found", () => {
-    // Use a deep tmp dir that definitely has no .pm.json up the chain
-    // This will walk up to / and fail. But to avoid walking the whole FS,
-    // we just test that it throws for a nonexistent isolated path.
     expect(() =>
       locateProjectFile("/tmp/pm-test-nonexistent-" + Date.now()),
     ).toThrow(/Could not locate .pm.json/)
@@ -266,7 +227,7 @@ describe("loadProjectFile", () => {
     writeFileSync(
       configPath,
       JSON.stringify({
-        doctypes: { feature: { dir: "features" } },
+        doctypes: { feature: { tag: "feat", dir: "features" } },
       }),
     )
     const project = loadProjectFile(configPath)
@@ -289,7 +250,7 @@ describe("loadProjectFile", () => {
     writeFileSync(
       configPath,
       JSON.stringify({
-        doctypes: { feature: { dir: "/absolute" } },
+        doctypes: { feature: { tag: "feat", dir: "/absolute" } },
       }),
     )
     expect(() => loadProjectFile(configPath)).toThrow(/dir must be relative/)

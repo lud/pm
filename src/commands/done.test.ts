@@ -58,7 +58,7 @@ describe("done command", () => {
     vi.spyOn(process, "cwd").mockReturnValue(dir)
     vi.mocked(loadProjectFrom).mockReturnValue(
       resolveProject(
-        { doctypes: { feature: { dir: "context/features" } } },
+        { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
         join(dir, ".pm.json"),
       ),
     )
@@ -87,7 +87,7 @@ describe("done command", () => {
     vi.spyOn(process, "cwd").mockReturnValue(dir)
     vi.mocked(loadProjectFrom).mockReturnValue(
       resolveProject(
-        { doctypes: { feature: { dir: "context/features" } } },
+        { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
         join(dir, ".pm.json"),
       ),
     )
@@ -102,7 +102,7 @@ describe("done command", () => {
     vi.spyOn(process, "cwd").mockReturnValue(FIXTURE_DIR)
     vi.mocked(loadProjectFrom).mockReturnValue(
       resolveProject(
-        { doctypes: { feature: { dir: "context/features" } } },
+        { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
         join(FIXTURE_DIR, ".pm.json"),
       ),
     )

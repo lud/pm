@@ -13,9 +13,15 @@ const FIXTURE_DIR = join(
 
 const workspace = createTestWorkspace("listing")
 
+const FULL_DOCTYPES = {
+  feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+  spec: { tag: "spec", dir: ".", parent: "feature" },
+  task: { tag: "task", dir: ".", parent: "spec" },
+}
+
 function loadFixtureProject() {
   return resolveProject(
-    { doctypes: { feature: { dir: "context/features" } } },
+    { doctypes: FULL_DOCTYPES },
     join(FIXTURE_DIR, ".pm.json"),
   )
 }
@@ -119,7 +125,7 @@ describe("listDocuments", () => {
     )
 
     const project = resolveProject(
-      { doctypes: { feature: { dir: "context/features" } } },
+      { doctypes: FULL_DOCTYPES },
       join(dir, ".pm.json"),
     )
 
@@ -178,7 +184,7 @@ describe("listDocuments", () => {
     )
 
     const project = resolveProject(
-      { idMask: "0", doctypes: { feature: { dir: "features" } } },
+      { idMask: "0", doctypes: { feature: { tag: "feat", dir: "features" } } },
       join(dir, ".pm.json"),
     )
     const entries = listDocuments(project, { active: true, done: true })
@@ -199,7 +205,7 @@ const MULTI_STATUS_DIR = join(
 
 function loadMultiStatusProject() {
   return resolveProject(
-    { doctypes: { feature: { dir: "context/features" } } },
+    { doctypes: FULL_DOCTYPES },
     join(MULTI_STATUS_DIR, ".pm.json"),
   )
 }

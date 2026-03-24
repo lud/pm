@@ -1,7 +1,6 @@
 import { z } from "zod"
 import { join, isAbsolute, dirname } from "node:path"
 import { accessSync, constants } from "node:fs"
-import { merge } from "lodash-es"
 import { readFileSyncOrAbort } from "./fs-helpers.js"
 import { abortError } from "./cli.js"
 
@@ -35,30 +34,6 @@ export const ProjectConfigSchema = z.object({
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>
 
 // ---------------------------------------------------------------------------
-// Default doctypes
-// ---------------------------------------------------------------------------
-
-export const DEFAULT_DOCTYPES: Record<string, Partial<DoctypeConfig>> = {
-  feature: {
-    tag: "feat",
-    intermediateDir: true,
-    doneStatuses: ["done"],
-  },
-  spec: {
-    tag: "spec",
-    dir: ".",
-    parent: "feature",
-    doneStatuses: ["done"],
-  },
-  task: {
-    tag: "task",
-    dir: ".",
-    parent: "spec",
-    doneStatuses: ["done"],
-  },
-}
-
-// ---------------------------------------------------------------------------
 // Resolved project (absolute paths, validated)
 // ---------------------------------------------------------------------------
 
@@ -76,42 +51,7 @@ export type ResolvedProject = {
 }
 
 // ---------------------------------------------------------------------------
-// Merge defaults with user config
-// ---------------------------------------------------------------------------
-
-function mergeWithDefaults(
-  userDoctypes: Record<string, unknown>,
-): Record<string, unknown> {
-  // 1. Collect null keys (user wants to remove these defaults)
-  const nullKeys = new Set<string>()
-  for (const [key, value] of Object.entries(userDoctypes)) {
-    if (value === null) {
-      nullKeys.add(key)
-    }
-  }
-
-  // 2. Build defaults minus null-removed keys
-  const defaults: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(DEFAULT_DOCTYPES)) {
-    if (!nullKeys.has(key)) {
-      defaults[key] = { ...value }
-    }
-  }
-
-  // 3. Build user config minus null entries
-  const userClean: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(userDoctypes)) {
-    if (value !== null) {
-      userClean[key] = value
-    }
-  }
-
-  // 4. Deep merge
-  return merge(defaults, userClean)
-}
-
-// ---------------------------------------------------------------------------
-// Validation (post-merge)
+// Validation
 // ---------------------------------------------------------------------------
 
 function validateDoctypes(doctypes: Record<string, DoctypeConfig>): void {
@@ -228,17 +168,10 @@ export function resolveProject(
 ): ResolvedProject {
   const projectDir = dirname(projectFile)
 
-  // Merge doctypes with defaults
-  const userDoctypes = (rawConfig.doctypes ?? {}) as Record<string, unknown>
-  const mergedDoctypes = mergeWithDefaults(userDoctypes)
-
-  // Parse through schema (strips $schema, applies defaults)
+  // Parse through schema (strips $schema, applies field defaults)
   let config: ProjectConfig
   try {
-    config = ProjectConfigSchema.parse({
-      ...rawConfig,
-      doctypes: mergedDoctypes,
-    })
+    config = ProjectConfigSchema.parse(rawConfig)
   } catch (err) {
     if (err instanceof z.ZodError) {
       const issues = err.issues.map(

@@ -46,7 +46,7 @@ const FIXTURE_DIR = join(
 function setupProject() {
   vi.mocked(loadProjectFrom).mockReturnValue(
     resolveProject(
-      { doctypes: { feature: { dir: "context/features" } } },
+      { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
       join(FIXTURE_DIR, ".pm.json"),
     ),
   )

@@ -9,11 +9,15 @@ function projectWith(
   return resolveProject({ doctypes }, "/tmp/.pm.json")
 }
 
+const FULL_DOCTYPES = {
+  feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+  spec: { tag: "spec", dir: ".", parent: "feature" },
+  task: { tag: "task", dir: ".", parent: "spec" },
+}
+
 describe("getProjectInfo", () => {
   it("formats default doctypes", () => {
-    const project = projectWith({
-      feature: { dir: "context/features" },
-    })
+    const project = projectWith(FULL_DOCTYPES)
     const output = getProjectInfo(project)
 
     // Header present
@@ -39,9 +43,7 @@ describe("getProjectInfo", () => {
   })
 
   it("sorts root doctypes before child doctypes", () => {
-    const project = projectWith({
-      feature: { dir: "context/features" },
-    })
+    const project = projectWith(FULL_DOCTYPES)
     const output = getProjectInfo(project)
     const lines = output.split("\n")
 
@@ -56,9 +58,6 @@ describe("getProjectInfo", () => {
 
   it("handles custom doctypes", () => {
     const project = projectWith({
-      feature: null,
-      spec: null,
-      task: null,
       epic: {
         tag: "epic",
         dir: "epics",
@@ -90,7 +89,9 @@ describe("getProjectInfo", () => {
 
   it("shows dir for doctypes with their own directory", () => {
     const project = projectWith({
-      feature: { dir: "docs/features" },
+      feature: { tag: "feat", dir: "docs/features", intermediateDir: true },
+      spec: { tag: "spec", dir: ".", parent: "feature" },
+      task: { tag: "task", dir: ".", parent: "spec" },
     })
     const output = getProjectInfo(project)
     expect(output).toContain("docs/features")

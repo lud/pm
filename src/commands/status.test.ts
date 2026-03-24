@@ -58,7 +58,7 @@ describe("status command", () => {
     vi.spyOn(process, "cwd").mockReturnValue(BASIC_DIR)
     vi.mocked(loadProjectFrom).mockReturnValue(
       resolveProject(
-        { doctypes: { feature: { dir: "context/features" } } },
+        { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
         join(BASIC_DIR, ".pm.json"),
       ),
     )
@@ -75,7 +75,7 @@ describe("status command", () => {
     vi.spyOn(process, "cwd").mockReturnValue(MULTI_STATUS_DIR)
     vi.mocked(loadProjectFrom).mockReturnValue(
       resolveProject(
-        { doctypes: { feature: { dir: "context/features" } } },
+        { doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } } },
         join(MULTI_STATUS_DIR, ".pm.json"),
       ),
     )

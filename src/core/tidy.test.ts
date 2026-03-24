@@ -83,7 +83,7 @@ describe("buildTidyPlan with idMask change", () => {
       join(dir, ".pm.json"),
       JSON.stringify({
         idMask: "0",
-        doctypes: { feature: { dir: "context/features" } },
+        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
       }),
     )
 
@@ -125,7 +125,7 @@ describe("buildTidyPlan with idMask change", () => {
       join(dir, ".pm.json"),
       JSON.stringify({
         idMask: "0",
-        doctypes: { feature: { dir: "context/features" } },
+        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
       }),
     )
 
@@ -230,7 +230,7 @@ describe("buildTidyPlan with orphans", () => {
     writeFileSync(
       join(dir, ".pm.json"),
       JSON.stringify({
-        doctypes: { feature: { dir: "context/features" } },
+        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
       }),
     )
     writeFileSync(
@@ -259,7 +259,7 @@ describe("buildTidyPlan with orphans", () => {
     writeFileSync(
       join(dir, ".pm.json"),
       JSON.stringify({
-        doctypes: { feature: { dir: "context/features" } },
+        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
       }),
     )
     writeFileSync(
@@ -291,7 +291,7 @@ describe("buildTidyPlan with orphans", () => {
     writeFileSync(
       join(dir, ".pm.json"),
       JSON.stringify({
-        doctypes: { feature: { dir: "context/features" } },
+        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
       }),
     )
     writeFileSync(
@@ -330,7 +330,7 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
     writeFileSync(
       join(dir, ".pm.json"),
       JSON.stringify({
-        doctypes: { feature: { dir: "context/features" } },
+        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
       }),
     )
     writeFileSync(
@@ -360,7 +360,7 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
     writeFileSync(
       join(dir, ".pm.json"),
       JSON.stringify({
-        doctypes: { feature: { dir: "context/features" } },
+        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
       }),
     )
     writeFileSync(
@@ -393,7 +393,7 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
     writeFileSync(
       join(dir, ".pm.json"),
       JSON.stringify({
-        doctypes: { feature: { dir: "context/features" } },
+        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
       }),
     )
     writeFileSync(
@@ -436,7 +436,7 @@ describe("buildTidyPlan with ambiguous duplicate parent", () => {
     writeFileSync(
       join(dir, ".pm.json"),
       JSON.stringify({
-        doctypes: { feature: { dir: "context/features" } },
+        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
       }),
     )
     writeFileSync(
@@ -546,7 +546,7 @@ describe("applyTidyPlan", () => {
     writeFileSync(
       join(dir, ".pm.json"),
       JSON.stringify({
-        doctypes: { feature: { dir: "context/features" } },
+        doctypes: { feature: { tag: "feat", dir: "context/features", intermediateDir: true }, spec: { tag: "spec", dir: ".", parent: "feature" }, task: { tag: "task", dir: ".", parent: "spec" } },
       }),
     )
     writeFileSync(

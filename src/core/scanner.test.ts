@@ -104,9 +104,15 @@ const FIXTURE_DIR = join(
   "../../test/fixtures/basic-project",
 )
 
+const FULL_DOCTYPES = {
+  feature: { tag: "feat", dir: "context/features", intermediateDir: true },
+  spec: { tag: "spec", dir: ".", parent: "feature" },
+  task: { tag: "task", dir: ".", parent: "spec" },
+}
+
 function loadFixtureProject() {
   return resolveProject(
-    { doctypes: { feature: { dir: "context/features" } } },
+    { doctypes: FULL_DOCTYPES },
     join(FIXTURE_DIR, ".pm.json"),
   )
 }
@@ -163,7 +169,7 @@ describe("getNextId", () => {
 
   it("returns 1 when no documents exist", () => {
     const project = resolveProject(
-      { doctypes: { feature: { dir: "nonexistent" } } },
+      { doctypes: { feature: { tag: "feat", dir: "nonexistent" } } },
       join(FIXTURE_DIR, ".pm.json"),
     )
     expect(getNextId(project)).toBe(1)
