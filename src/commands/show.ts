@@ -1,6 +1,7 @@
 import { command } from "cleye"
 import { loadProjectFrom } from "../lib/project.js"
 import { showDocument, type ShowResult } from "../core/documents.js"
+import type { DocumentInfo } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
 import { formatPath } from "../lib/format.js"
 import * as cli from "../lib/cli.js"
@@ -23,46 +24,64 @@ export const showCommand = command(
         cli.abortError(`Document ${id} not found`)
       }
 
-      printShowResult(result, process.cwd())
+      const fmtId = project.formatId
+      const cwd = process.cwd()
+      cli.info(formatDocumentHeader(result.document, cwd, fmtId))
+      if (result.parents.length > 0) {
+        cli.info("")
+        cli.info(formatParentsList(result.parents, fmtId))
+      }
+      if (result.children.length > 0) {
+        cli.info("")
+        cli.info(formatChildrenList(result.children, fmtId))
+      }
     } catch (err) {
       cli.abortError((err as Error).message)
     }
   },
 )
 
-export function printShowResult(result: ShowResult, cwd: string): void {
-  const { document: doc, parents, children } = result
+export function formatDocumentHeader(
+  doc: DocumentInfo,
+  cwd: string,
+  formatId: (id: number) => string,
+): string {
+  const title = doc.frontmatter.title ?? doc.slug
+  const status = doc.frontmatter.status ?? "(no status)"
+  const lines = [
+    `${formatId(doc.id)} ${doc.doctype.name} ${title} (${status})`,
+    `in ${formatPath(doc.path, cwd)}`,
+  ]
+  return lines.join("\n")
+}
 
-  // Document properties
-  cli.info(`doctype: ${doc.doctype.name}`)
-  cli.info(`id: ${doc.id}`)
-  cli.info(`path: ${formatPath(doc.path, cwd)}`)
-  cli.info(`title: ${doc.frontmatter.title ?? doc.slug}`)
-  cli.info(`status: ${doc.frontmatter.status ?? "(none)"}`)
+function formatDocLine(
+  doc: DocumentInfo,
+  formatId: (id: number) => string,
+): string {
+  const status = doc.frontmatter.status ?? "(no status)"
+  const title = doc.frontmatter.title ?? doc.slug
+  return `  ${doc.doctype.name} ${formatId(doc.id)} ${title} (${status})`
+}
 
-  // Parents
-  if (parents.length > 0) {
-    cli.info("")
-    cli.info("Parents:")
-    for (const parent of parents) {
-      const status = parent.frontmatter.status ?? "(none)"
-      const title = parent.frontmatter.title ?? parent.slug
-      cli.info(
-        `  ${parent.doctype.name} ${String(parent.id).padStart(3, "0")} ${title} (${status})`,
-      )
-    }
+export function formatParentsList(
+  parents: DocumentInfo[],
+  formatId: (id: number) => string,
+): string {
+  const lines = ["Parents:"]
+  for (const parent of parents) {
+    lines.push(formatDocLine(parent, formatId))
   }
+  return lines.join("\n")
+}
 
-  // Children
-  if (children.length > 0) {
-    cli.info("")
-    cli.info("Children:")
-    for (const child of children) {
-      const status = child.frontmatter.status ?? "(none)"
-      const title = child.frontmatter.title ?? child.slug
-      cli.info(
-        `  ${child.doctype.name} ${String(child.id).padStart(3, "0")} ${title} (${status})`,
-      )
-    }
+export function formatChildrenList(
+  children: DocumentInfo[],
+  formatId: (id: number) => string,
+): string {
+  const lines = ["Children:"]
+  for (const child of children) {
+    lines.push(formatDocLine(child, formatId))
   }
+  return lines.join("\n")
 }

@@ -171,7 +171,7 @@ async function promptSelectDocument(
   candidates: DocumentEntry[],
 ): Promise<DocumentEntry | null> {
   const choices = candidates.map((c) => ({
-    name: `${c.tag} ${String(c.id).padStart(3, "0")} ${c.frontmatter.title ?? c.slug}`,
+    name: `${c.tag} ${c.id} ${c.frontmatter.title ?? c.slug}`,
     value: c.path,
   }))
 

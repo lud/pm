@@ -60,3 +60,24 @@ export function createTestProject(label: string) {
     },
   }
 }
+
+/**
+ * Remove leading indentation from a template literal string.
+ * Strips the first empty line and trailing whitespace,
+ * then removes the common leading whitespace from all lines.
+ */
+export function dedent(text: string): string {
+  // Remove leading newline
+  const stripped = text.replace(/^\n/, "")
+  const lines = stripped.split("\n")
+  // Remove trailing empty lines
+  while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
+    lines.pop()
+  }
+  // Find minimum indentation (ignoring empty lines)
+  const indents = lines
+    .filter((l) => l.trim().length > 0)
+    .map((l) => l.match(/^(\s*)/)![1].length)
+  const minIndent = indents.length > 0 ? Math.min(...indents) : 0
+  return lines.map((l) => l.slice(minIndent)).join("\n")
+}

@@ -4,24 +4,31 @@ import { loadProjectFrom } from "../lib/project.js"
 import { getStatusSummary, type StatusSummary } from "../core/listing.js"
 import { showDocument } from "../core/documents.js"
 import { getCurrentId } from "../core/current.js"
-import { printShowResult } from "./show.js"
+import { formatDocumentHeader, formatParentsList } from "./show.js"
 import type { ResolvedProject } from "../lib/project.js"
 import * as cli from "../lib/cli.js"
+
+function formatStatusMarker(s: {
+  status: string
+  isDone: boolean
+  isBlocked: boolean
+}): string {
+  if (s.isDone && s.status !== "done") return " [done]"
+  if (s.isBlocked && s.status !== "blocked") return " [blocked]"
+  return ""
+}
 
 function formatStatusSummary(summary: StatusSummary[]): string {
   const blocks: string[] = []
 
   for (const entry of summary) {
-    const parts = [`${entry.active} active`]
-    if (entry.blocked > 0) parts.push(`${entry.blocked} blocked`)
-    parts.push(`${entry.done} done`)
-    blocks.push(`${entry.doctype}: ${parts.join(", ")}`)
+    blocks.push(`${entry.doctype}:`)
 
     if (entry.statuses.length > 0) {
-      const rows = entry.statuses.map((s) => {
-        const marker = s.isBlocked ? " [blocked]" : s.isDone ? " [done]" : ""
-        return [`  ${s.status}${marker}`, String(s.count)]
-      })
+      const rows = entry.statuses.map((s) => [
+        `  ${s.status}${formatStatusMarker(s)}`,
+        String(s.count),
+      ])
       blocks.push(table(rows, { align: ["l", "r"], hsep: "  " }))
     }
   }
@@ -44,7 +51,12 @@ export function runStatusDisplay(project: ResolvedProject): void {
     cli.info("Current document:")
     const result = showDocument(project, currentId)
     if (result) {
-      printShowResult(result, process.cwd())
+      const fmtId = project.formatId
+      cli.info(formatDocumentHeader(result.document, process.cwd(), fmtId))
+      if (result.parents.length > 0) {
+        cli.info("")
+        cli.info(formatParentsList(result.parents, fmtId))
+      }
     } else {
       cli.warning(`Current document ${currentId} not found`)
     }

@@ -49,6 +49,7 @@ export type ResolvedProject = {
   projectDir: string
   idPadWidth: number
   doctypes: Record<string, ResolvedDoctype>
+  formatId: (id: number) => string
 }
 
 // ---------------------------------------------------------------------------
@@ -200,11 +201,13 @@ export function resolveProject(
     }
   }
 
+  const idPadWidth = config.idMask.length
   return {
     projectFile,
     projectDir,
-    idPadWidth: config.idMask.length,
+    idPadWidth,
     doctypes: resolved,
+    formatId: (id: number) => String(id).padStart(idPadWidth, "0"),
   }
 }
 

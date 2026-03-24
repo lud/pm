@@ -8,7 +8,11 @@ import {
   clearCurrentId,
   touchCurrent,
 } from "../core/current.js"
-import { printShowResult } from "./show.js"
+import {
+  formatDocumentHeader,
+  formatParentsList,
+  formatChildrenList,
+} from "./show.js"
 import * as cli from "../lib/cli.js"
 
 export const currentCommand = command(
@@ -47,6 +51,16 @@ export const currentCommand = command(
       return
     }
 
-    printShowResult(result, process.cwd())
+    const fmtId = project.formatId
+    const cwd = process.cwd()
+    cli.info(formatDocumentHeader(result.document, cwd, fmtId))
+    if (result.parents.length > 0) {
+      cli.info("")
+      cli.info(formatParentsList(result.parents, fmtId))
+    }
+    if (result.children.length > 0) {
+      cli.info("")
+      cli.info(formatChildrenList(result.children, fmtId))
+    }
   },
 )

@@ -104,7 +104,7 @@ describe("default command", () => {
 
     const calls = vi.mocked(cliMod.info).mock.calls.map(([msg]) => msg)
     const output = calls.join("\n")
-    expect(output).toContain("active")
-    expect(output).toContain("done")
+    expect(output).toContain("feature:")
+    expect(output).toContain("new")
   })
 })

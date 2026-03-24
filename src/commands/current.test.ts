@@ -83,6 +83,13 @@ function setupMutableProject() {
   return dir
 }
 
+function infoOutput(): string {
+  return vi
+    .mocked(cliMod.info)
+    .mock.calls.map(([msg]) => msg)
+    .join("\n")
+}
+
 describe("current command", () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -93,19 +100,16 @@ describe("current command", () => {
     setupMutableProject()
 
     cli({ name: "pm", commands: [currentCommand] }, undefined, ["current"])
-    expect(cliMod.info).toHaveBeenCalledWith(
-      expect.stringContaining("No current document"),
-    )
+    expect(infoOutput()).toContain("No current document")
   })
 
   it("sets and displays current document", () => {
     setupMutableProject()
 
-    // Set current to doc 1
     cli({ name: "pm", commands: [currentCommand] }, undefined, ["current", "1"])
 
-    expect(cliMod.info).toHaveBeenCalledWith("doctype: feature")
-    expect(cliMod.info).toHaveBeenCalledWith("id: 1")
+    const output = infoOutput()
+    expect(output).toContain("001 feature User authentication (new)")
   })
 
   it("shows previously set current document", () => {
@@ -117,7 +121,10 @@ describe("current command", () => {
 
     // Read current
     cli({ name: "pm", commands: [currentCommand] }, undefined, ["current"])
-    expect(cliMod.info).toHaveBeenCalledWith("id: 2")
+    const output = infoOutput()
+    expect(output).toContain("002 spec Login flow (new)")
+    expect(output).toContain("Parents:")
+    expect(output).toContain("feature 001 User authentication")
   })
 
   it("aborts on invalid ID", () => {

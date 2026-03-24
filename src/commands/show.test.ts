@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { cli } from "cleye"
-import { createTestProject } from "../lib/test-setup.js"
+import { createTestProject, dedent } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {
   const actual = (await vi.importActual("../lib/cli.js")) as Record<
@@ -74,6 +74,13 @@ const BASIC_SETUP = {
   },
 } as const
 
+function infoOutput(): string {
+  return vi
+    .mocked(cliMod.info)
+    .mock.calls.map(([msg]) => msg)
+    .join("\n")
+}
+
 describe("show command", () => {
   let dir: string
 
@@ -89,45 +96,54 @@ describe("show command", () => {
     vi.restoreAllMocks()
   })
 
-  it("displays document properties", () => {
+  it("displays a feature with children", () => {
     cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "1"])
-    expect(cliMod.info).toHaveBeenCalledWith("doctype: feature")
-    expect(cliMod.info).toHaveBeenCalledWith("id: 1")
-    expect(cliMod.info).toHaveBeenCalledWith("title: User authentication")
-    expect(cliMod.info).toHaveBeenCalledWith("status: new")
-  })
+    expect(infoOutput()).toBe(
+      dedent(`
+      001 feature User authentication (new)
+      in context/features/001.feat.user-auth/001.feat.user-auth.md
 
-  it("displays relative path", () => {
-    cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "1"])
-    expect(cliMod.info).toHaveBeenCalledWith(
-      expect.stringMatching(/^path: context\/features\//),
+      Children:
+        spec 002 Login flow (new)
+      `),
     )
   })
 
-  it("shows children of a feature", () => {
-    cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "1"])
-    const calls = vi.mocked(cliMod.info).mock.calls.map(([msg]) => msg)
-    expect(calls).toContain("Children:")
-    // spec 002 is a child of feature 001
-    const childLine = calls.find(
-      (c) => c.includes("002") && c.includes("Login flow"),
-    )
-    expect(childLine).toBeDefined()
-  })
-
-  it("shows parents of a spec", () => {
+  it("displays a spec with parents and children", () => {
     cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "2"])
-    const calls = vi.mocked(cliMod.info).mock.calls.map(([msg]) => msg)
-    expect(calls).toContain("Parents:")
-    const parentLine = calls.find(
-      (c) => c.includes("001") && c.includes("User authentication"),
+    expect(infoOutput()).toBe(
+      dedent(`
+      002 spec Login flow (new)
+      in context/features/001.feat.user-auth/002.spec.login-flow.md
+
+      Parents:
+        feature 001 User authentication (new)
+
+      Children:
+        task 003 Add JWT middleware (done)
+        task 004 Session store (new)
+      `),
     )
-    expect(parentLine).toBeDefined()
+  })
+
+  it("displays a leaf task with parents only", () => {
+    cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "3"])
+    expect(infoOutput()).toBe(
+      dedent(`
+      003 task Add JWT middleware (done)
+      in context/features/001.feat.user-auth/003.task.jwt-middleware.md
+
+      Parents:
+        feature 001 User authentication (new)
+        spec 002 Login flow (new)
+      `),
+    )
   })
 
   it("accepts zero-padded IDs", () => {
     cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "001"])
-    expect(cliMod.info).toHaveBeenCalledWith("id: 1")
+    const output = infoOutput()
+    expect(output).toContain("001 feature User authentication")
   })
 
   it("aborts on non-existent document", () => {

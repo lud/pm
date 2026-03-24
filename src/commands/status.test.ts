@@ -142,8 +142,8 @@ describe("status command", () => {
     cli({ name: "pm", commands: [statusCommand] }, undefined, ["status"])
     const lines = infoLines()
     const output = lines.join("\n")
-    expect(output).toContain("active")
-    expect(output).toContain("done")
+    expect(output).toContain("feature:")
+    expect(output).toContain("new")
   })
 
   it("shows status breakdown for multi-status project", () => {
