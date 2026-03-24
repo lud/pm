@@ -142,7 +142,7 @@ describe("status command", () => {
     cli({ name: "pm", commands: [statusCommand] }, undefined, ["status"])
     const lines = infoLines()
     const output = lines.join("\n")
-    expect(output).toContain("feature:")
+    expect(output).toContain("feature")
     expect(output).toContain("new")
   })
 
@@ -156,6 +156,6 @@ describe("status command", () => {
     const lines = infoLines()
     const output = lines.join("\n")
     // multi-status fixture has multiple status values
-    expect(output).toContain("feature:")
+    expect(output).toContain("feature")
   })
 })

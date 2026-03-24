@@ -21,17 +21,23 @@ function formatStatusMarker(s: {
 function formatStatusSummary(summary: StatusSummary[]): string {
   const blocks: string[] = []
 
+  const rows = []
   for (const entry of summary) {
-    blocks.push(`${entry.doctype}:`)
+    // blocks.push(`${entry.doctype}:`)
+    rows.push([entry.doctype])
 
     if (entry.statuses.length > 0) {
-      const rows = entry.statuses.map((s) => [
-        `  ${s.status}${formatStatusMarker(s)}`,
-        String(s.count),
-      ])
-      blocks.push(table(rows, { align: ["l", "r"], hsep: "  " }))
+      entry.statuses.forEach((s) => {
+        rows.push([
+          "",
+          `  ${s.status}${formatStatusMarker(s)}`,
+          String(s.count),
+        ])
+      })
     }
   }
+  blocks.push("Status breakdown:")
+  blocks.push(table(rows, { align: ["l", "l", "r"], hsep: "  " }))
 
   return blocks.join("\n")
 }
