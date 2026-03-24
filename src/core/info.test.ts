@@ -31,7 +31,7 @@ describe("getProjectInfo", () => {
     expect(output).toContain("spec")
     expect(output).toContain("→ feature")
     expect(output).toContain("(parent dir)")
-    expect(output).toContain("specified")
+    expect(output).toContain("done")
 
     // Task row
     expect(output).toContain("task")

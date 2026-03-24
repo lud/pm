@@ -47,14 +47,14 @@ branch below.
 
 ### Spec
 
-- **Status is not `specified`:** Read the spec content. Provide a brief summary
-  and either suggest additions or ask the user if the spec is complete. If the
-  user confirms it is complete, mark it as done with `pm done <id>`.
-- **Status is `specified`:** Check for child tasks with `pm show <id>`.
+- **Status is done:** Proceed to Step 3 (find next work).
+- **Status is not done (including `specified`):** Check for child tasks with
+  `pm show <id>`.
   - If tasks exist, pick the first not-done task — go to Step 2 with that task
     (set it as current first).
-  - If no tasks exist, suggest splitting the spec into tasks. Propose a
-    breakdown and ask the user for confirmation before creating them.
+  - If no tasks exist, treat the spec as active implementation guidance: read
+    it, summarize intent, and either start implementing directly or ask the
+    user whether to split it into tasks first.
 
 ### Feature
 

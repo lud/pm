@@ -252,7 +252,7 @@ describe("getStatusSummary", () => {
     expect(features.statuses).toHaveLength(2)
 
     const specs = summary.find((s) => s.doctype === "spec")!
-    expect(specs.active).toBe(1)
-    expect(specs.done).toBe(1)
+    expect(specs.active).toBe(2)
+    expect(specs.done).toBe(0)
   })
 })

@@ -48,7 +48,7 @@ export const DEFAULT_DOCTYPES: Record<string, Partial<DoctypeConfig>> = {
     tag: "spec",
     dir: ".",
     parent: "feature",
-    doneStatuses: ["specified"],
+    doneStatuses: ["done"],
   },
   task: {
     tag: "task",

@@ -1,10 +1,10 @@
 ---
 name: pm-guide
 description:
-  Guide for using the `pm` project management CLI in any pm-managed project.
-  Use this whenever you detect a `.pm.json` file or when the user mentions
-  features, specs, tasks, current work, project status, or project management
-  documents, even if they do not explicitly ask for `pm` help.
+  Guide for using the `pm` project management CLI in any pm-managed project. Use
+  this whenever you detect a `.pm.json` file or when the user mentions features,
+  specs, tasks, current work, project status, or project management documents,
+  even if they do not explicitly ask for `pm` help.
 user-invocable: true
 ---
 
@@ -39,7 +39,7 @@ The default doctypes are:
 | Doctype   | Tag    | Parent    | Done statuses | Creates directory |
 | --------- | ------ | --------- | ------------- | ----------------- |
 | `feature` | `feat` | (none)    | `done`        | yes               |
-| `spec`    | `spec` | `feature` | `specified`   | no                |
+| `spec`    | `spec` | `feature` | `done`        | no                |
 | `task`    | `task` | `spec`    | `done`        | no                |
 
 The hierarchy is: **feature → spec → task**. A spec belongs to a feature, a task
@@ -60,9 +60,9 @@ created_on: 2026-03-23
 ---
 ```
 
-- `parent` — usually references the parent document as `{id}.{tag}.{slug}`.
-  PM also accepts a numeric ID alone as a shorthand when editing manually.
-  Omitted for root documents.
+- `parent` — usually references the parent document as `{id}.{tag}.{slug}`. PM
+  also accepts a numeric ID alone as a shorthand when editing manually. Omitted
+  for root documents.
 - `title` — human-readable title.
 - `status` — free-form string. Each doctype defines "done statuses" that mark
   work as complete.
@@ -142,9 +142,6 @@ pm done 003                                  # Mark as done (first done status)
 pm current 003                               # Set document 003 as current
 ```
 
-Use `--set key:value` for frontmatter updates. Positional `key:value` arguments
-are no longer supported by `pm edit`.
-
 ## Typical workflow
 
 1. **Start a session**: run `pm` or `pm current` to see where work was left off.
@@ -168,6 +165,6 @@ are no longer supported by `pm edit`.
 - Statuses are free-form. Set them on create with `pm new ... -s <status>` or
   with `pm new ... --set status:<status>`, and update them with
   `pm edit <id> --set status:<status>`.
-- Common statuses: `new`, `in-progress`, `blocked`, `specified` (for specs),
-  `done`.
+- Common statuses: `new`, `in-progress`, `blocked`, `specified` (for specs,
+  active), `done`.
 - The `--help` flag on any command shows all available options.

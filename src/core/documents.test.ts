@@ -368,10 +368,10 @@ describe("markDone", () => {
     expect(doc.frontmatter.status).toBe("done")
   })
 
-  it("sets status to 'specified' for spec", () => {
+  it("sets status to 'done' for spec", () => {
     const project = loadMutableProject()
     const doc = markDone(project, 2)
-    expect(doc.frontmatter.status).toBe("specified")
+    expect(doc.frontmatter.status).toBe("done")
   })
 
   it("sets status to 'done' for task", () => {
