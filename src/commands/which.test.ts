@@ -90,14 +90,64 @@ describe("which command", () => {
     vi.restoreAllMocks()
   })
 
-  it("outputs the .pm.json path relative to cwd", () => {
+  it("outputs the absolute project directory when no args", () => {
     cli({ name: "pm", commands: [whichCommand] }, undefined, ["which"])
-    expect(cliMod.info).toHaveBeenCalledWith(".pm.json")
+    expect(cliMod.info).toHaveBeenCalledWith(dir)
   })
 
-  it("outputs absolute path when cwd is elsewhere", () => {
-    vi.spyOn(process, "cwd").mockReturnValue("/home")
-    cli({ name: "pm", commands: [whichCommand] }, undefined, ["which"])
-    expect(cliMod.info).toHaveBeenCalledWith(join(dir, ".pm.json"))
+  it("outputs the path of a document by ID", () => {
+    cli({ name: "pm", commands: [whichCommand] }, undefined, ["which", "1"])
+    expect(cliMod.info).toHaveBeenCalledWith(
+      "context/features/001.feat.user-auth/001.feat.user-auth.md",
+    )
+  })
+
+  it("accepts zero-padded IDs", () => {
+    cli({ name: "pm", commands: [whichCommand] }, undefined, ["which", "002"])
+    expect(cliMod.info).toHaveBeenCalledWith(
+      "context/features/001.feat.user-auth/002.spec.login-flow.md",
+    )
+  })
+
+  it("outputs multiple document paths", () => {
+    cli({ name: "pm", commands: [whichCommand] }, undefined, [
+      "which",
+      "1",
+      "3",
+    ])
+    expect(cliMod.info).toHaveBeenCalledTimes(2)
+    expect(cliMod.info).toHaveBeenNthCalledWith(
+      1,
+      "context/features/001.feat.user-auth/001.feat.user-auth.md",
+    )
+    expect(cliMod.info).toHaveBeenNthCalledWith(
+      2,
+      "context/features/001.feat.user-auth/003.task.jwt-middleware.md",
+    )
+  })
+
+  it("aborts with error for unknown document ID", () => {
+    expect(() => {
+      cli({ name: "pm", commands: [whichCommand] }, undefined, ["which", "999"])
+    }).toThrow("Document 999 not found")
+  })
+
+  it("aborts with error for invalid ID", () => {
+    expect(() => {
+      cli({ name: "pm", commands: [whichCommand] }, undefined, ["which", "abc"])
+    }).toThrow('Invalid document ID: "abc"')
+  })
+
+  it("aborts on first unknown ID, skipping remaining", () => {
+    expect(() => {
+      cli({ name: "pm", commands: [whichCommand] }, undefined, [
+        "which",
+        "1",
+        "999",
+        "2",
+      ])
+    }).toThrow("Document 999 not found")
+    // Only the first document's path was output before the error
+    expect(cliMod.info).toHaveBeenCalledTimes(1)
   })
 })

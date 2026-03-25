@@ -123,10 +123,12 @@ pm list -S                 # List all documents regardless of status
 pm list -p 001             # List direct children of document 001
 pm list --status waiting --is owner:alice  # Filter by exact status and property
 pm list --is priority:2    # Filter by numeric custom property
-pm show 003                # Show document 003 with parents and children
+pm show 003                # Show document 003 title, status, path, parents and children
 pm read 003                # Print full file contents of document 003
 pm current                 # Show the current document and its context
-pm which                   # Print path to .pm.json
+pm which                   # Print project directory path
+pm which 003               # Print path to document 003
+pm which 1 2 3             # Print paths for multiple documents
 ```
 
 ### Creating documents
