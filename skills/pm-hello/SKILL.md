@@ -26,7 +26,7 @@ pm current
 ```
 
 If there is **no current document**, list not-done features with
-`pm list -t feature` and ask the user which one to work on. Stop here until they
+`pm list --type feature` and ask the user which one to work on. Stop here until they
 choose.
 
 If there **is** a current document, read it with `pm read <id>` and proceed to

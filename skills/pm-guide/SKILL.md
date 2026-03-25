@@ -116,11 +116,11 @@ pm init                    # Create .pm.json in current directory
 pm info                    # Show project config: doctypes, hierarchy, statuses
 pm status                  # Counts per doctype + current document details
 pm list                    # List active documents (default: not done, not blocked)
-pm list -t task            # List active tasks only
+pm list --type task        # List active tasks only
 pm list --done             # List done documents only
 pm list --blocked          # List blocked documents only
-pm list -S                 # List all documents regardless of status
-pm list -p 001             # List direct children of document 001
+pm list --all-statuses     # List all documents regardless of status
+pm list --parent 001       # List direct children of document 001
 pm list --status waiting --is owner:alice  # Filter by exact status and property
 pm list --is priority:2    # Filter by numeric custom property
 pm show 003                # Show document 003 title, status, path, parents and children
@@ -135,11 +135,11 @@ pm which 1 2 3             # Print paths for multiple documents
 
 ```bash
 pm new feature User authentication           # Create a feature (title: "User authentication")
-pm new spec Login flow -p 001                # Create a spec under feature 001
-pm new task Add JWT middleware -p 002        # Create a task under spec 002
-pm new feature Payment -s urgent             # Create with custom status
-pm new feature Search --set status:blocked   # Custom status via property
-pm new spec API design -p 001 -e             # Create and open in $EDITOR
+pm new spec Login flow --parent 001           # Create a spec under feature 001
+pm new task Add JWT middleware --parent 002   # Create a task under spec 002
+pm new feature Payment --status urgent        # Create with custom status
+pm new feature Search --set status:blocked    # Custom status via property
+pm new spec API design --parent 001 --editor  # Create and open in $EDITOR
 ```
 
 Title words are joined automatically — no quotes needed. The slug is derived
@@ -150,7 +150,7 @@ from the title (lowercased, spaces become hyphens).
 ```bash
 pm edit 003 --set status:in-progress         # Set status
 pm edit 003 --set status:waiting --set reason:"waiting on API"  # Set multiple properties
-pm edit 003 -p 002                           # Set/change parent
+pm edit 003 --parent 002                     # Set/change parent
 pm done 003                                  # Mark as done (first done status)
 pm blocked 003                               # Mark as blocked (first blocked status)
 pm current 003                               # Set document 003 as current
@@ -172,7 +172,7 @@ pm current 003                               # Set document 003 as current
 
 ```bash
 pm next                    # Find the next workable document
-pm next -v                 # Same, with verbose traversal log
+pm next --verbose          # Same, with verbose traversal log
 ```
 
 `pm next` starts from the current document and traverses the hierarchy to find
@@ -191,7 +191,7 @@ If the next document (feature, spec or task) is not really actionable, use your 
    recursively) if there are children, recursively, until a leaf is reached.
 4. Do not select done or blocked documents.
 
-Use `pm show <id>` (to see children and parents) or `pm list -p <id>` (to list
+Use `pm show <id>` (to see children and parents) or `pm list --parent <id>` (to list
 direct children of a document), filtering out done and blocked documents.
 
 ## Tips for agents
@@ -204,8 +204,8 @@ direct children of a document), filtering out done and blocked documents.
   and is the usual canonical format.
 - Use `pm current <id>` to track what you're working on — the next session will
   pick up from there.
-- Statuses are free-form. Set them on create with `pm new ... -s <status>` or
-  with `pm new ... --set status:<status>`, and update them with
+- Statuses are free-form. Set them on create with `pm new ... --status <status>`
+  or with `pm new ... --set status:<status>`, and update them with
   `pm edit <id> --set status:<status>`.
 - Use `pm done <id>` and `pm blocked <id>` to set status via the doctype's
   configured done/blocked statuses. Use `pm edit` for any other status value.

@@ -60,7 +60,7 @@ descriptive — a noun phrase, not a sentence.
 ## Step 3 — Create the feature
 
 ```bash
-pm new feature <Title> -s idea
+pm new feature <Title> --status idea
 ```
 
 Use the status `idea` to distinguish these from actively planned features.

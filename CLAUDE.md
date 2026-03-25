@@ -8,6 +8,8 @@ This repository is the source code for the `pm` CLI. The `skills/` directory con
 
 Skills are created and edited frequently in this project. When creating a new skill, always ask the user whether it should go in the project `skills/` directory (shared, checked into the repo) or in the user's config directory (`$CLAUDE_CONFIG_DIR/skills/`, personal).
 
+When writing `pm` command examples in skills, always use long option names (e.g. `--parent`, `--status`, `--type`) instead of short flags (`-p`, `-s`, `-t`). Agents parse long options more reliably.
+
 ## Project structure
 
 ```
