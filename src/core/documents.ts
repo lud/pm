@@ -10,11 +10,11 @@ import { mkdirSyncOrAbort, writeFileSyncOrAbort } from "../lib/fs-helpers.js"
 import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
 import { extractParentId, formatParentRef } from "./parent-ref.js"
 import {
-  collectAllDocuments,
   type DocumentFile,
   findDocumentById,
   formatDocumentFilename,
   getNextId,
+  scanDocuments,
 } from "./scanner.js"
 
 // ---------------------------------------------------------------------------
@@ -106,8 +106,7 @@ export function showDocument(
 
   // Find children (requires full scan)
   const children: DocumentInfo[] = []
-  const allDocs = collectAllDocuments(project)
-  for (const file of allDocs) {
+  for (const file of scanDocuments(project)) {
     if (file.id === id) continue
     const child = loadDocumentInfo(file)
     if (extractParentId(child.frontmatter.parent) === id) {

@@ -3,11 +3,7 @@ import { parseFrontmatter } from "../lib/frontmatter.js"
 import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
 import type { PropertyFilter } from "../lib/properties.js"
 import { extractParentId } from "./parent-ref.js"
-import {
-  collectAllDocuments,
-  type DocumentFile,
-  scanDocuments,
-} from "./scanner.js"
+import { type DocumentFile, scanDocuments } from "./scanner.js"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -183,8 +179,6 @@ export function listDocuments(
 // ---------------------------------------------------------------------------
 
 export function getStatusSummary(project: ResolvedProject): StatusSummary[] {
-  const allDocs = collectAllDocuments(project)
-
   const doctypeData = new Map<
     string,
     {
@@ -197,7 +191,7 @@ export function getStatusSummary(project: ResolvedProject): StatusSummary[] {
     }
   >()
 
-  for (const doc of allDocs) {
+  for (const doc of scanDocuments(project)) {
     const content = readFileSync(doc.path, "utf-8")
     const { data } = parseFrontmatter(content)
     const status = (data.status as string | undefined) ?? "(none)"

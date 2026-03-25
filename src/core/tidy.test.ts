@@ -18,7 +18,7 @@ vi.mock("../lib/cli.js", async () => {
 import { parseFrontmatter } from "../lib/frontmatter.js"
 import { loadProjectFile } from "../lib/project.js"
 import { createTestProject } from "../lib/test-setup.js"
-import { collectAllDocuments } from "./scanner.js"
+import { scanDocuments } from "./scanner.js"
 import { applyTidyPlan, buildTidyPlan, type DocumentEntry } from "./tidy.js"
 
 const BASIC_DOCTYPES = {
@@ -166,7 +166,7 @@ describe("buildTidyPlan with idMask change", () => {
 
     // Re-scan and verify
     const newProject = reloadProject(dir)
-    const docs = collectAllDocuments(newProject)
+    const docs = [...scanDocuments(newProject)]
     const ids = docs.map((d) => d.id).sort((a, b) => a - b)
     expect(ids).toEqual([1, 2, 3, 4])
 
@@ -463,7 +463,7 @@ describe("applyTidyPlan", () => {
 
     // Re-scan from project dir
     const newProject = reloadProject(dir)
-    const newDocs = collectAllDocuments(newProject)
+    const newDocs = [...scanDocuments(newProject)]
     const ids = newDocs.map((d) => d.id).sort((a, b) => a - b)
     expect(ids).toEqual([1, 2, 3, 4])
     expect(new Set(ids).size).toBe(ids.length)
@@ -475,7 +475,7 @@ describe("applyTidyPlan", () => {
     applyTidyPlan(plan)
 
     const newProject = reloadProject(dir)
-    const newDocs = collectAllDocuments(newProject)
+    const newDocs = [...scanDocuments(newProject)]
     const signup = newDocs.find((d) => d.slug === "signup")
     expect(signup).toBeDefined()
     expect(signup!.id).toBe(4)
@@ -526,7 +526,7 @@ describe("applyTidyPlan", () => {
     applyTidyPlan(plan)
 
     const newProject = reloadProject(dir)
-    const newDocs = collectAllDocuments(newProject)
+    const newDocs = [...scanDocuments(newProject)]
     const child = newDocs.find((d) => d.slug === "child")
     expect(child).toBeDefined()
     const childContent = readFileSync(child!.path, "utf-8")

@@ -1,7 +1,7 @@
 import type { ResolvedProject } from "../lib/project.js"
 import { type DocumentInfo, loadDocumentInfo } from "./documents.js"
 import { extractParentId } from "./parent-ref.js"
-import { collectAllDocuments } from "./scanner.js"
+import { scanDocuments } from "./scanner.js"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,7 +52,7 @@ export type NextOptions = {
 function buildGraph(project: ResolvedProject): Map<number, GraphNode> {
   const nodes = new Map<number, GraphNode>()
 
-  for (const file of collectAllDocuments(project)) {
+  for (const file of scanDocuments(project)) {
     const doc = loadDocumentInfo(file)
     const status = doc.frontmatter.status as string | undefined
     const parentId = extractParentId(doc.frontmatter.parent)

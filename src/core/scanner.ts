@@ -152,16 +152,6 @@ export function findDocumentById(
 }
 
 /**
- * Collect all documents into an array (needed for operations like
- * finding the next ID or listing all documents).
- */
-// TODO this function loads everything in memory. We should find call sites ande
-// replace with scanDocuments if possible
-export function collectAllDocuments(project: ResolvedProject): DocumentFile[] {
-  return [...scanDocuments(project)]
-}
-
-/**
  * Get the next available global ID.
  */
 export function getNextId(project: ResolvedProject): number {

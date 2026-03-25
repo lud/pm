@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { search } from "@inquirer/prompts"
 import { command } from "cleye"
-import { collectAllDocuments } from "../core/scanner.js"
+import { scanDocuments } from "../core/scanner.js"
 import {
   applyTidyPlan,
   buildTidyPlan,
@@ -103,8 +103,7 @@ export const tidyCommand = command(
 
         // Re-scan to get current state (previous moves may have changed paths)
         const freshProject = loadProjectFrom(process.cwd())
-        const allDocs = collectAllDocuments(freshProject)
-        const candidates = allDocs
+        const candidates = [...scanDocuments(freshProject)]
           .filter((d) => d.doctype.name === expectedParentDoctype)
           .map((d) => {
             const content = readFileSync(d.path, "utf-8")

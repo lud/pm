@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 import {
-  collectAllDocuments,
   findDocumentById,
   formatDocumentFilename,
   getNextId,
   parseDocumentFilename,
   parseDocumentRef,
+  scanDocuments,
 } from "./scanner.js"
 
 // ---------------------------------------------------------------------------
@@ -137,14 +137,14 @@ const BASIC_SETUP: TestSetup = {
 describe("scanDocuments", () => {
   it("yields all documents from fixture", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const docs = collectAllDocuments(project)
+    const docs = [...scanDocuments(project)]
     const ids = docs.map((d) => d.id).sort((a, b) => a - b)
     expect(ids).toEqual([1, 2, 3, 4])
   })
 
   it("assigns correct tags", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const docs = collectAllDocuments(project)
+    const docs = [...scanDocuments(project)]
     const byId = Object.fromEntries(docs.map((d) => [d.id, d]))
     expect(byId[1].tag).toBe("feat")
     expect(byId[2].tag).toBe("spec")
@@ -154,7 +154,7 @@ describe("scanDocuments", () => {
 
   it("ignores non-document files", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const docs = collectAllDocuments(project)
+    const docs = [...scanDocuments(project)]
     // Should only find .md files with valid {id}.{tag}.{slug}.md pattern
     for (const doc of docs) {
       expect(doc.tag).toMatch(/^[a-zA-Z]/)

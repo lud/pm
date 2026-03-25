@@ -7,17 +7,13 @@ import {
   writeFileSyncOrAbort,
 } from "../lib/fs-helpers.js"
 import type { ResolvedProject } from "../lib/project.js"
+import type { Document } from "./documents.js"
 import {
   extractParentId,
   formatParentRef,
   parseParentRef,
 } from "./parent-ref.js"
-import {
-  collectAllDocuments,
-  type DocumentFile,
-  formatDocumentFilename,
-} from "./scanner.js"
-import type { Document } from "./documents.js"
+import { formatDocumentFilename, scanDocuments } from "./scanner.js"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,7 +65,7 @@ export type ParentPrompt = (
 // ---------------------------------------------------------------------------
 
 function loadAllDocuments(project: ResolvedProject): DocumentEntry[] {
-  const files = collectAllDocuments(project)
+  const files = [...scanDocuments(project)]
   return files.map((file) => {
     const content = readFileSync(file.path, "utf-8")
     const { data, body } = parseFrontmatter(content)
