@@ -50,7 +50,7 @@ export const nextCommand = command(
       return
     }
 
-    cli.info(formatDocumentHeader(result.document, process.cwd(), fmtId))
+    cli.info(formatDocumentHeader(result, process.cwd(), fmtId))
   },
 )
 

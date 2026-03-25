@@ -42,11 +42,12 @@ export function formatDocumentFilename(
 // Scanned document entry
 // ---------------------------------------------------------------------------
 
-export type ScannedDocument = {
+export type DocumentFile = {
   id: number
   tag: string
   slug: string
   path: string
+  extension: string
   doctype: ResolvedDoctype
 }
 
@@ -60,7 +61,7 @@ export type ScannedDocument = {
  */
 export function* scanDocuments(
   project: ResolvedProject,
-): Generator<ScannedDocument> {
+): Generator<DocumentFile> {
   // Build tag -> doctype lookup
   const tagToDoctype = new Map<string, ResolvedDoctype>()
   for (const dt of Object.values(project.doctypes)) {
@@ -92,7 +93,7 @@ export function* scanDocuments(
 function* scanDirectory(
   dir: string,
   tagToDoctype: Map<string, ResolvedDoctype>,
-): Generator<ScannedDocument> {
+): Generator<DocumentFile> {
   let entries: string[]
   try {
     entries = readdirSync(dir)
@@ -114,6 +115,7 @@ function* scanDirectory(
             tag: parsed.tag,
             slug: parsed.slug,
             path: fullPath,
+            extension: "md",
             doctype,
           }
         }
@@ -142,7 +144,7 @@ function* scanDirectory(
 export function findDocumentById(
   project: ResolvedProject,
   id: number,
-): ScannedDocument | null {
+): DocumentFile | null {
   for (const doc of scanDocuments(project)) {
     if (doc.id === id) return doc
   }
@@ -153,9 +155,9 @@ export function findDocumentById(
  * Collect all documents into an array (needed for operations like
  * finding the next ID or listing all documents).
  */
-export function collectAllDocuments(
-  project: ResolvedProject,
-): ScannedDocument[] {
+// TODO this function loads everything in memory. We should find call sites ande
+// replace with scanDocuments if possible
+export function collectAllDocuments(project: ResolvedProject): DocumentFile[] {
   return [...scanDocuments(project)]
 }
 

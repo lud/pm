@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs"
-import { type FrontmatterData, parseFrontmatter } from "../lib/frontmatter.js"
-import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
-import type { ShowResult } from "./documents.js"
+import type { ResolvedProject } from "../lib/project.js"
+import { type DocumentInfo, loadDocumentInfo } from "./documents.js"
 import { extractParentId } from "./parent-ref.js"
 import { collectAllDocuments } from "./scanner.js"
 
@@ -10,15 +8,8 @@ import { collectAllDocuments } from "./scanner.js"
 // ---------------------------------------------------------------------------
 
 export type GraphNode = {
-  id: number
-  tag: string
-  slug: string
-  path: string
-  doctype: ResolvedDoctype
-  frontmatter: FrontmatterData
+  document: DocumentInfo
   parentId: number | null
-  status: string | undefined
-  title: string | undefined
   isAvailable: boolean
   children: number[]
 }
@@ -61,28 +52,19 @@ export type NextOptions = {
 function buildGraph(project: ResolvedProject): Map<number, GraphNode> {
   const nodes = new Map<number, GraphNode>()
 
-  for (const scanned of collectAllDocuments(project)) {
-    const content = readFileSync(scanned.path, "utf-8")
-    const { data } = parseFrontmatter(content)
-    const status = typeof data.status === "string" ? data.status : undefined
-    const title = typeof data.title === "string" ? data.title : undefined
-    const parentId = extractParentId(data.parent)
+  for (const file of collectAllDocuments(project)) {
+    const doc = loadDocumentInfo(file)
+    const status = doc.frontmatter.status as string | undefined
+    const parentId = extractParentId(doc.frontmatter.parent)
 
     const isDone =
-      status !== undefined && scanned.doctype.doneStatuses.includes(status)
+      status !== undefined && doc.doctype.doneStatuses.includes(status)
     const isBlocked =
-      status !== undefined && scanned.doctype.blockedStatuses.includes(status)
+      status !== undefined && doc.doctype.blockedStatuses.includes(status)
 
-    nodes.set(scanned.id, {
-      id: scanned.id,
-      tag: scanned.tag,
-      slug: scanned.slug,
-      path: scanned.path,
-      doctype: scanned.doctype,
-      frontmatter: data,
+    nodes.set(doc.id, {
+      document: doc,
       parentId,
-      status,
-      title,
       isAvailable: !isDone && !isBlocked,
       children: [],
     })
@@ -93,7 +75,7 @@ function buildGraph(project: ResolvedProject): Map<number, GraphNode> {
     if (node.parentId !== null) {
       const parent = nodes.get(node.parentId)
       if (parent) {
-        parent.children.push(node.id)
+        parent.children.push(node.document.id)
       }
     }
   }
@@ -119,8 +101,8 @@ function getSiblings(
     // Root level: siblings are all root nodes
     const roots: number[] = []
     for (const node of nodes.values()) {
-      if (node.parentId === null && node.id !== cursorId) {
-        roots.push(node.id)
+      if (node.parentId === null && node.document.id !== cursorId) {
+        roots.push(node.document.id)
       }
     }
     return roots.sort((a, b) => a - b)
@@ -140,7 +122,7 @@ export function findNextDocument(
   project: ResolvedProject,
   currentId: number,
   options: NextOptions = {},
-): ShowResult | null {
+): DocumentInfo | null {
   const emit = options.onEvent ?? (() => {})
   const nodes = buildGraph(project)
   const visited = new Set<number>()
@@ -197,21 +179,7 @@ export function findNextDocument(
         // Step 4a: leaf found → return it
         emit({ type: TraversalEventTypes.Found, cursorId: cursorId })
         const node = nodes.get(cursorId)!
-        const showResult: ShowResult = {
-          document: {
-            id: node.id,
-            tag: node.tag,
-            slug: node.slug,
-            path: node.path,
-            doctype: node.doctype,
-            frontmatter: node.frontmatter,
-            body: "",
-          },
-          // Unused for now so we do not scan them
-          parents: [],
-          children: [],
-        }
-        return showResult
+        return node.document
       }
 
       // Has children — find available ones

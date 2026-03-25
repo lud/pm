@@ -6,11 +6,13 @@ import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 import {
   createDocument,
   editDocument,
+  loadDocument,
   markBlocked,
   markDone,
   readDocument,
   showDocument,
 } from "./documents.js"
+import { findDocumentById } from "./scanner.js"
 
 const testProject = createTestProject("documents")
 
@@ -68,7 +70,7 @@ describe("readDocument", () => {
     expect(readDocument(project, 999)).toBeNull()
   })
 
-  it("includes body content", () => {
+  it("includes body content via loadDocument", () => {
     const { dir, project } = testProject.setup(BASIC_SETUP)
     // Append body content after setup (setup only writes frontmatter)
     const filePath = join(
@@ -77,8 +79,9 @@ describe("readDocument", () => {
     )
     appendFileSync(filePath, "\nFeature for user authentication.\n")
 
-    const doc = readDocument(project, 1)
-    expect(doc!.body).toContain("Feature for user authentication")
+    const file = findDocumentById(project, 1)!
+    const doc = loadDocument(file)
+    expect(doc.body).toContain("Feature for user authentication")
   })
 
   it("does not include id in frontmatter", () => {

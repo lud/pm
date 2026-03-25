@@ -5,7 +5,7 @@ import type { PropertyFilter } from "../lib/properties.js"
 import { extractParentId } from "./parent-ref.js"
 import {
   collectAllDocuments,
-  type ScannedDocument,
+  type DocumentFile,
   scanDocuments,
 } from "./scanner.js"
 
@@ -14,10 +14,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export type ListEntry = {
-  id: number
-  tag: string
-  slug: string
-  path: string
+  document: DocumentFile
   doctypeName: string
   title: string
   status: string | undefined
@@ -58,7 +55,7 @@ type Predicate = {
 }
 
 type ReaderResult = {
-  doc: ScannedDocument
+  doc: DocumentFile
   frontmatter?: Record<string, unknown>
   status?: string
   title?: string
@@ -152,7 +149,7 @@ export function listDocuments(
       const content = readFileSync(doc.path, "utf-8")
       const { data } = parseFrontmatter(content)
       result.frontmatter = data
-      result.status = typeof data.status === "string" ? data.status : undefined
+      result.status = data.status as string | undefined
       result.title = typeof data.title === "string" ? data.title : undefined
       result.parentId = extractParentId(data.parent)
     }
@@ -165,22 +162,19 @@ export function listDocuments(
       const content = readFileSync(doc.path, "utf-8")
       const { data } = parseFrontmatter(content)
       result.frontmatter = data
-      result.status = typeof data.status === "string" ? data.status : undefined
+      result.status = data.status as string | undefined
       result.title = typeof data.title === "string" ? data.title : undefined
     }
 
     results.push({
-      id: doc.id,
-      tag: doc.tag,
-      slug: doc.slug,
-      path: doc.path,
+      document: doc,
       doctypeName: doc.doctype.name,
       title: result.title ?? doc.slug,
       status: result.status,
     })
   }
 
-  results.sort((a, b) => a.id - b.id)
+  results.sort((a, b) => a.document.id - b.document.id)
   return results
 }
 
@@ -206,7 +200,7 @@ export function getStatusSummary(project: ResolvedProject): StatusSummary[] {
   for (const doc of allDocs) {
     const content = readFileSync(doc.path, "utf-8")
     const { data } = parseFrontmatter(content)
-    const status = typeof data.status === "string" ? data.status : "(none)"
+    const status = (data.status as string | undefined) ?? "(none)"
     const category = classifyStatus(
       status === "(none)" ? undefined : status,
       doc.doctype,

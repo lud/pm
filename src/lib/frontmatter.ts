@@ -12,6 +12,19 @@ export function parseFrontmatter(content: string): {
   if (!match) return { data: {}, body: content }
   const data = (yaml.parse(match[1]) as Record<string, unknown>) ?? {}
   const body = content.slice(match[0].length)
+
+  // Normalize well-known fields so consumers don't need runtime type guards
+  if ("status" in data && typeof data.status !== "string") {
+    delete data.status
+  }
+  if (
+    "parent" in data &&
+    typeof data.parent !== "string" &&
+    typeof data.parent !== "number"
+  ) {
+    delete data.parent
+  }
+
   return { data, body }
 }
 

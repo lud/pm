@@ -77,14 +77,14 @@ describe("findNextDocument", () => {
     const { project } = testProject.setup(SCENARIO_FULL)
     const result = findNextDocument(project, 4)
     expect(result).not.toBeNull()
-    expect(result!.document.id).toBe(5)
+    expect(result!.id).toBe(5)
   })
 
   it("scenario B: picks earlier sibling when current is last", () => {
     const { project } = testProject.setup(SCENARIO_FULL)
     const result = findNextDocument(project, 5)
     expect(result).not.toBeNull()
-    expect(result!.document.id).toBe(4)
+    expect(result!.id).toBe(4)
   })
 
   it("scenario C: goes to parent sibling when no task sibling available", () => {
@@ -103,7 +103,7 @@ describe("findNextDocument", () => {
     const result = findNextDocument(project, 4)
     expect(result).not.toBeNull()
     // Goes up to spec 2 → sibling spec 6 → child task 7
-    expect(result!.document.id).toBe(7)
+    expect(result!.id).toBe(7)
   })
 
   it("scenario D: traverses across features to find leaf spec", () => {
@@ -127,7 +127,7 @@ describe("findNextDocument", () => {
     const result = findNextDocument(project, 4, {})
     expect(result).not.toBeNull()
     // Goes up through specs, across to feat 8, down to spec 9 (leaf)
-    expect(result!.document.id).toBe(9)
+    expect(result!.id).toBe(9)
   })
 
   it("scenario E: traverses from deep task to distant leaf", () => {
@@ -155,7 +155,7 @@ describe("findNextDocument", () => {
     })
     const result = findNextDocument(project, 4)
     expect(result).not.toBeNull()
-    expect(result!.document.id).toBe(9)
+    expect(result!.id).toBe(9)
   })
 
   it("scenario F: returns null when all documents unavailable", () => {
@@ -220,7 +220,7 @@ describe("findNextDocument", () => {
     // Goes up to spec 2 → sibling spec 6 → child task 7
     const result = findNextDocument(project, 4)
     expect(result).not.toBeNull()
-    expect(result!.document.id).toBe(7)
+    expect(result!.id).toBe(7)
   })
 
   it("selects leaf spec when it has no children", () => {
@@ -246,7 +246,7 @@ describe("findNextDocument", () => {
     })
     const result = findNextDocument(project, 2)
     expect(result).not.toBeNull()
-    expect(result!.document.id).toBe(3)
+    expect(result!.id).toBe(3)
   })
 
   it("handles single root feature with no children", () => {
@@ -265,7 +265,7 @@ describe("findNextDocument", () => {
     })
     const result = findNextDocument(project, 1)
     expect(result).not.toBeNull()
-    expect(result!.document.id).toBe(2)
+    expect(result!.id).toBe(2)
   })
 
   it("returns null for single document project", () => {

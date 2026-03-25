@@ -88,7 +88,7 @@ export const listCommand = command(
     for (const entry of entries) {
       const statusStr = entry.status ? ` (${entry.status})` : ""
       cli.info(
-        `${entry.tag} ${project.formatId(entry.id)} ${entry.title}${statusStr}`,
+        `${entry.document.tag} ${project.formatId(entry.document.id)} ${entry.title}${statusStr}`,
       )
     }
   },

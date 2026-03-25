@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import {
+  type FrontmatterData,
   parseFrontmatter,
   prependFrontmatter,
   setFrontmatterProperties,
@@ -10,23 +11,31 @@ import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
 import { extractParentId, formatParentRef } from "./parent-ref.js"
 import {
   collectAllDocuments,
+  type DocumentFile,
   findDocumentById,
   formatDocumentFilename,
   getNextId,
-  type ScannedDocument,
 } from "./scanner.js"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type DocumentInfo = {
-  id: number
-  tag: string
-  slug: string
-  path: string
-  doctype: ResolvedDoctype
-  frontmatter: Record<string, unknown>
+export type { DocumentFile } from "./scanner.js"
+
+/**
+ * A document file with parsed frontmatter (no body).
+ * Frontmatter is normalized: status is string|undefined, parent is number|string|undefined.
+ */
+export type DocumentInfo = DocumentFile & {
+  frontmatter: FrontmatterData
+}
+
+/**
+ * A full document with frontmatter and body content.
+ * Use DocumentInfo when the body is not needed.
+ */
+export type Document = DocumentInfo & {
   body: string
 }
 
@@ -55,15 +64,20 @@ export function readDocument(
   return loadDocumentInfo(scanned)
 }
 
-function loadDocumentInfo(scanned: ScannedDocument): DocumentInfo {
-  const content = readFileSync(scanned.path, "utf-8")
+export function loadDocumentInfo(file: DocumentFile): DocumentInfo {
+  const content = readFileSync(file.path, "utf-8")
+  const { data } = parseFrontmatter(content)
+  return {
+    ...file,
+    frontmatter: data,
+  }
+}
+
+export function loadDocument(file: DocumentFile): Document {
+  const content = readFileSync(file.path, "utf-8")
   const { data, body } = parseFrontmatter(content)
   return {
-    id: scanned.id,
-    tag: scanned.tag,
-    slug: scanned.slug,
-    path: scanned.path,
-    doctype: scanned.doctype,
+    ...file,
     frontmatter: data,
     body,
   }
@@ -93,12 +107,11 @@ export function showDocument(
   // Find children (requires full scan)
   const children: DocumentInfo[] = []
   const allDocs = collectAllDocuments(project)
-  for (const scanned of allDocs) {
-    if (scanned.id === id) continue
-    const childContent = readFileSync(scanned.path, "utf-8")
-    const { data } = parseFrontmatter(childContent)
-    if (extractParentId(data.parent) === id) {
-      children.push(loadDocumentInfo(scanned))
+  for (const file of allDocs) {
+    if (file.id === id) continue
+    const child = loadDocumentInfo(file)
+    if (extractParentId(child.frontmatter.parent) === id) {
+      children.push(child)
     }
   }
 
@@ -358,6 +371,6 @@ function resolveTargetDirectory(
  * for intermediateDir documents, this IS their own directory;
  * for non-intermediateDir documents, this is shared with their parent.
  */
-function getSelfDirectory(doc: ScannedDocument): string {
+function getSelfDirectory(doc: DocumentFile): string {
   return dirname(doc.path)
 }

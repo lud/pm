@@ -98,14 +98,14 @@ describe("listDocuments", () => {
     const { project } = testProject.setup(BASIC_SETUP)
     const entries = listDocuments(project)
     // Doc 3 is done, so should be excluded
-    const ids = entries.map((e) => e.id).sort((a, b) => a - b)
+    const ids = entries.map((e) => e.document.id).sort((a, b) => a - b)
     expect(ids).toEqual([1, 2, 4])
   })
 
   it("lists done documents with --done", () => {
     const { project } = testProject.setup(BASIC_SETUP)
     const entries = listDocuments(project, { done: true })
-    const ids = entries.map((e) => e.id)
+    const ids = entries.map((e) => e.document.id)
     expect(ids).toEqual([3])
   })
 
@@ -121,7 +121,7 @@ describe("listDocuments", () => {
       doctype: "task",
       allStatuses: true,
     })
-    const ids = entries.map((e) => e.id).sort((a, b) => a - b)
+    const ids = entries.map((e) => e.document.id).sort((a, b) => a - b)
     expect(ids).toEqual([3, 4])
   })
 
@@ -132,7 +132,7 @@ describe("listDocuments", () => {
       allStatuses: true,
     })
     expect(entries).toHaveLength(1)
-    expect(entries[0].id).toBe(3)
+    expect(entries[0].document.id).toBe(3)
   })
 
   it("filters by direct parent", () => {
@@ -142,7 +142,7 @@ describe("listDocuments", () => {
       parentId: 1,
       allStatuses: true,
     })
-    const ids = entries.map((e) => e.id).sort((a, b) => a - b)
+    const ids = entries.map((e) => e.document.id).sort((a, b) => a - b)
     expect(ids).toEqual([2])
   })
 
@@ -153,7 +153,7 @@ describe("listDocuments", () => {
       parentId: 2,
       allStatuses: true,
     })
-    const ids = entries.map((e) => e.id).sort((a, b) => a - b)
+    const ids = entries.map((e) => e.document.id).sort((a, b) => a - b)
     expect(ids).toEqual([3, 4])
   })
 
@@ -169,7 +169,7 @@ describe("listDocuments", () => {
   it("includes title from frontmatter", () => {
     const { project } = testProject.setup(BASIC_SETUP)
     const entries = listDocuments(project, { allStatuses: true })
-    const feat = entries.find((e) => e.id === 1)
+    const feat = entries.find((e) => e.document.id === 1)
     expect(feat!.title).toBe("User authentication")
   })
 
@@ -198,7 +198,7 @@ describe("listDocuments", () => {
       allStatuses: true,
     })
 
-    const ids = entries.map((e) => e.id)
+    const ids = entries.map((e) => e.document.id)
     expect(ids).toEqual([4])
   })
 
@@ -234,7 +234,7 @@ describe("listDocuments", () => {
     })
 
     const entries = listDocuments(project, { allStatuses: true })
-    const ids = entries.map((e) => e.id)
+    const ids = entries.map((e) => e.document.id)
     // Should be sorted by numeric ID, not filesystem order
     expect(ids).toEqual([2, 10])
   })

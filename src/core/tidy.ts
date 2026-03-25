@@ -14,17 +14,16 @@ import {
 } from "./parent-ref.js"
 import {
   collectAllDocuments,
+  type DocumentFile,
   formatDocumentFilename,
-  type ScannedDocument,
 } from "./scanner.js"
+import type { Document } from "./documents.js"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type DocumentEntry = ScannedDocument & {
-  frontmatter: Record<string, unknown>
-  body: string
+export type DocumentEntry = Document & {
   parentId: number | null
 }
 
@@ -70,12 +69,12 @@ export type ParentPrompt = (
 // ---------------------------------------------------------------------------
 
 function loadAllDocuments(project: ResolvedProject): DocumentEntry[] {
-  const scanned = collectAllDocuments(project)
-  return scanned.map((s) => {
-    const content = readFileSync(s.path, "utf-8")
+  const files = collectAllDocuments(project)
+  return files.map((file) => {
+    const content = readFileSync(file.path, "utf-8")
     const { data, body } = parseFrontmatter(content)
     return {
-      ...s,
+      ...file,
       frontmatter: data,
       body,
       parentId: extractParentId(data.parent),
