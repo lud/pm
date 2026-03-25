@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-03-25
+
+### 🚀 Features
+
+- Allow the which command to print document paths
+
+### 🚜 Refactor
+
+- Normalize data representation of documents
+- Deleted greedy array document scanner
+
+### 📚 Documentation
+
+- Use long options in skills
+
+### ⚙️ Miscellaneous Tasks
+
+- Cleanup spec documents
+
 ## [0.6.0] - 2026-03-24
 
 ### 🚀 Features
