@@ -197,7 +197,9 @@ direct children of a document), filtering out done and blocked documents.
 ## Tips for agents
 
 - Always start by running `pm status` to understand the project state.
-- Use `pm show <id>` to understand a document's position in the hierarchy.
+- To get the full context of a document, use `pm show <id>` to understand a
+  document's position in the hierarchy and see the ID of all parents. Then read
+  each one in order with `pm read <id>`. Topmost parent is listed first.
 - When creating specs or tasks, always provide the `-p` flag with the parent ID.
 - When editing frontmatter directly, you may set `parent` to just the numeric ID
   like `1` as a shorthand, but the full `{id}.{tag}.{slug}` form is also valid
