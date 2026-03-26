@@ -28,7 +28,7 @@ export const nextCommand = command(
 
     if (currentId === null) {
       cli.abortError(
-        "No current document set. Use `pm current <id>` to set one.",
+        "No current document set. Use `pm current $id` to set one.",
       )
     }
 

@@ -49,11 +49,16 @@ export type NextOptions = {
 // Build document graph
 // ---------------------------------------------------------------------------
 
-function buildGraph(project: ResolvedProject): Map<number, GraphNode> {
+function buildGraph(
+  project: ResolvedProject,
+  currentId?: number,
+): Map<number, GraphNode> {
   const nodes = new Map<number, GraphNode>()
 
   for (const file of scanDocuments(project)) {
     const doc = loadDocumentInfo(file)
+    if (!doc.doctype.workflows && doc.id !== currentId) continue
+
     const status = doc.frontmatter.status as string | undefined
     const parentId = extractParentId(doc.frontmatter.parent)
 
@@ -124,7 +129,7 @@ export function findNextDocument(
   options: NextOptions = {},
 ): DocumentInfo | null {
   const emit = options.onEvent ?? (() => {})
-  const nodes = buildGraph(project)
+  const nodes = buildGraph(project, currentId)
   const visited = new Set<number>()
 
   const currentNode = nodes.get(currentId)

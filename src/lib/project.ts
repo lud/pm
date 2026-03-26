@@ -17,6 +17,7 @@ const DoctypeSchema = z.object({
   doneStatuses: z.array(z.string()).default(["done"]),
   blockedStatuses: z.array(z.string()).default(["blocked"]),
   defaultStatus: z.string().default("new"),
+  workflows: z.boolean().default(true),
 })
 
 export type DoctypeConfig = z.infer<typeof DoctypeSchema>

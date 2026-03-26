@@ -282,6 +282,81 @@ describe("findNextDocument", () => {
     expect(result).toBeNull()
   })
 
+  it("skips doctypes with workflows disabled", () => {
+    const { project } = testProject.setup({
+      pmJson: {
+        doctypes: {
+          ...DOCTYPES,
+          context: {
+            tag: "ctx",
+            dir: "context/features",
+            intermediateDir: true,
+            workflows: false,
+          },
+        },
+      },
+      files: {
+        "context/features/001.feat.alpha/001.feat.alpha.md": {
+          title: "Alpha",
+          status: "new",
+        },
+        "context/features/001.feat.alpha/002.spec.design.md": {
+          parent: 1,
+          title: "Design",
+          status: "new",
+        },
+        "context/features/001.feat.alpha/003.task.first.md": {
+          parent: 2,
+          title: "First",
+          status: "new",
+        },
+        "context/features/010.ctx.notes.md": {
+          title: "Notes",
+          status: "new",
+        },
+      },
+    })
+    // Current=3 (task), no sibling tasks → up to spec 2, no sibling specs
+    // → up to feat 1, context 10 exists but workflows=false so invisible
+    // → exhausted
+    const result = findNextDocument(project, 3)
+    expect(result).toBeNull()
+  })
+
+  it("traverses from current document even when its doctype has workflows disabled", () => {
+    const { project } = testProject.setup({
+      pmJson: {
+        doctypes: {
+          feature: {
+            tag: "feat",
+            dir: "context/features",
+            intermediateDir: true,
+          },
+          context: {
+            tag: "ctx",
+            dir: "context/meta",
+            intermediateDir: true,
+            workflows: false,
+          },
+        },
+      },
+      files: {
+        "context/features/001.feat.alpha/001.feat.alpha.md": {
+          title: "Alpha",
+          status: "new",
+        },
+        "context/meta/002.ctx.notes.md": {
+          title: "Notes",
+          status: "new",
+        },
+      },
+    })
+    // Current is a workflows-disabled doc but still used as starting point
+    const result = findNextDocument(project, 2)
+    expect(result).not.toBeNull()
+    expect(result!.id).toBe(1)
+  })
+
   it("does not return the current document even if active", () => {
     // Only two tasks, current=4, sibling=3 is done. No other docs.
     const { project } = testProject.setup({

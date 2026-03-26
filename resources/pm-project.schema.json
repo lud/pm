@@ -57,6 +57,10 @@
           "defaultStatus": {
             "default": "new",
             "type": "string"
+          },
+          "workflows": {
+            "default": true,
+            "type": "boolean"
           }
         },
         "required": [
