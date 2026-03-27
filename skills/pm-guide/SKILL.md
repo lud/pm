@@ -125,7 +125,7 @@ pm list --status waiting --is owner:alice  # Filter by exact status and property
 pm list --is priority:2    # Filter by numeric custom property
 pm show 003                # Show document 003 title, status, path, parents and children
 pm read 003                # Print full file contents of document 003
-pm current                 # Show the current document and its context
+pm current                 # Show the current document and its parents/children if any
 pm which                   # Print project directory path
 pm which 003               # Print path to document 003
 pm which 1 2 3             # Print paths for multiple documents
@@ -158,7 +158,8 @@ pm current 003                               # Set document 003 as current
 
 ## Typical workflow
 
-1. **Start a session**: run `pm` or `pm current` to see where work was left off.
+1. **Start a session**: run `pm status` so see the state of the project and the
+  current document for ongoing work.
 2. **Check the current document**: read it with `pm read <id>`, understand the
    context.
 3. **Do the work**: implement, write, review — whatever the document describes.
