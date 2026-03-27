@@ -5,7 +5,11 @@ import { parseDocumentRef } from "../core/scanner.js"
 import * as cli from "../lib/cli.js"
 import { formatPath } from "../lib/format.js"
 import { loadProjectFrom } from "../lib/project.js"
-import { parsePropertyFlags } from "../lib/properties.js"
+import {
+  flagsToRecord,
+  parsePropertyFlag,
+  type PropertyFlag,
+} from "../lib/properties.js"
 
 export const editCommand = command(
   {
@@ -30,13 +34,15 @@ export const editCommand = command(
       cli.abortError(`Invalid document ID: "${argv._.id}"`)
     }
 
-    let properties: Record<string, unknown>
+    let flags: PropertyFlag[]
     try {
-      properties = parsePropertyFlags(argv.flags.set, "--set")
+      flags = (argv.flags.set ?? []).map((s) => parsePropertyFlag(s, "--set"))
     } catch (err) {
       cli.abortError((err as Error).message)
       return
     }
+
+    const properties = flagsToRecord(flags)
 
     let setParent: number | undefined
     if (argv.flags.parent) {
@@ -45,9 +51,10 @@ export const editCommand = command(
         cli.abortError(`Invalid parent ID: "${argv.flags.parent}"`)
       }
 
-      if (Object.hasOwn(properties, "parent")) {
+      const parentFlag = flags.find((f) => f.key === "parent")
+      if (parentFlag) {
         cli.abortError(
-          'Cannot combine --parent with --set parent:... on "edit"',
+          `Cannot combine --parent with --set ${parentFlag.raw} on "edit"`,
         )
       }
     }

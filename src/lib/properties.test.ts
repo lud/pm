@@ -10,10 +10,12 @@ describe("properties parsing", () => {
     expect(parsePropertyFlag("blocked:TRUE", "--set")).toEqual({
       key: "blocked",
       value: true,
+      raw: "blocked:TRUE",
     })
     expect(parsePropertyFlag("ready:False", "--set")).toEqual({
       key: "ready",
       value: false,
+      raw: "ready:False",
     })
   })
 
@@ -21,18 +23,22 @@ describe("properties parsing", () => {
     expect(parsePropertyFlag("count:-2", "--set")).toEqual({
       key: "count",
       value: -2,
+      raw: "count:-2",
     })
     expect(parsePropertyFlag("ratio:3.14", "--set")).toEqual({
       key: "ratio",
       value: 3.14,
+      raw: "ratio:3.14",
     })
     expect(parsePropertyFlag("text:123foo", "--set")).toEqual({
       key: "text",
       value: "123foo",
+      raw: "text:123foo",
     })
     expect(parsePropertyFlag("exact:1.0", "--set")).toEqual({
       key: "exact",
       value: "1.0",
+      raw: "exact:1.0",
     })
   })
 
@@ -40,6 +46,7 @@ describe("properties parsing", () => {
     expect(parsePropertyFlag("raw:[", "--set")).toEqual({
       key: "raw",
       value: "[",
+      raw: "raw:[",
     })
   })
 
@@ -62,8 +69,8 @@ describe("properties parsing", () => {
     expect(
       parsePropertyFilters(["priority:2", "blocked:false"], "--is"),
     ).toEqual([
-      { key: "priority", value: 2 },
-      { key: "blocked", value: false },
+      { key: "priority", value: 2, raw: "priority:2" },
+      { key: "blocked", value: false, raw: "blocked:false" },
     ])
   })
 })

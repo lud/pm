@@ -6,15 +6,19 @@ import { parseDocumentRef } from "../core/scanner.js"
 import * as cli from "../lib/cli.js"
 import { formatPath } from "../lib/format.js"
 import { loadProjectFrom } from "../lib/project.js"
-import { parsePropertyFlags } from "../lib/properties.js"
+import {
+  flagsToRecord,
+  parsePropertyFlag,
+  type PropertyFlag,
+  type PropertyValue,
+} from "../lib/properties.js"
 
-const RESERVED_NEW_SET_KEYS = new Set([
-  "id",
-  "title",
-  "status",
-  "parent",
-  "created_on",
-])
+const RESERVED_NEW_PROPERTIES: Record<string, (s: PropertyValue) => string> = {
+  id: () => "id is automatically generated",
+  title: () => "title is created from the command arguments",
+  status: (status: PropertyValue) => `use --status ${status}`,
+  parent: (parent: PropertyValue) => `use --parent ${parent}`,
+}
 
 export const newCommand = command(
   {
@@ -57,21 +61,25 @@ export const newCommand = command(
       }
     }
 
-    let setProperties: Record<string, unknown>
+    let flags: PropertyFlag[]
     try {
-      setProperties = parsePropertyFlags(argv.flags.set, "--set")
+      flags = (argv.flags.set ?? []).map((s) => parsePropertyFlag(s, "--set"))
     } catch (err) {
       cli.abortError((err as Error).message)
       return
     }
 
-    for (const key of Object.keys(setProperties)) {
-      if (RESERVED_NEW_SET_KEYS.has(key)) {
-        cli.abortError(
-          `Cannot use --set ${key}:... with "new". Use dedicated inputs instead.`,
+    const reservedErrors: string[] = []
+    for (const flag of flags) {
+      if (Object.hasOwn(RESERVED_NEW_PROPERTIES, flag.key)) {
+        reservedErrors.push(
+          `Cannot use "--set ${flag.raw}" with "new", ${RESERVED_NEW_PROPERTIES[flag.key](flag.value)}.`,
         )
       }
     }
+    if (reservedErrors.length) cli.abortError(reservedErrors.join("\n"))
+
+    const setProperties = flagsToRecord(flags)
 
     try {
       const result = createDocument(project, doctypeName, title, {

@@ -213,7 +213,7 @@ describe("new command", () => {
         "--set",
         "status:done",
       ]),
-    ).toThrow('Cannot use --set status:... with "new"')
+    ).toThrow('Cannot use "--set status:done" with "new"')
   })
 
   it("aborts on malformed --set assignment", () => {

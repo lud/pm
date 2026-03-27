@@ -138,7 +138,7 @@ pm new feature User authentication           # Create a feature (title: "User au
 pm new spec Login flow --parent 001           # Create a spec under feature 001
 pm new task Add JWT middleware --parent 002   # Create a task under spec 002
 pm new feature Payment --status urgent        # Create with custom status
-pm new feature Search --set status:blocked    # Custom status via property
+pm new feature Search --status blocked    # Custom status via property
 pm new spec API design --parent 001 --editor  # Create and open in $EDITOR
 ```
 

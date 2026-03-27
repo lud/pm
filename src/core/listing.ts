@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { parseFrontmatter } from "../lib/frontmatter.js"
 import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
-import type { PropertyFilter } from "../lib/properties.js"
+import type { PropertyFlag } from "../lib/properties.js"
 import { extractParentId } from "./parent-ref.js"
 import { type DocumentFile, scanDocuments } from "./scanner.js"
 
@@ -20,7 +20,7 @@ export type ListOptions = {
   doctype?: string
   parentId?: number
   status?: string
-  propertyFilters?: PropertyFilter[]
+  propertyFilters?: PropertyFlag[]
   done?: boolean
   blocked?: boolean
   allStatuses?: boolean

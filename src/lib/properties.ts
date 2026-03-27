@@ -1,14 +1,16 @@
 import * as yaml from "yaml"
 
-export type PropertyFilter = {
+export type PropertyValue = string | boolean | number
+export type PropertyFlag = {
   key: string
-  value: unknown
+  value: PropertyValue
+  raw: string
 }
 
 export function parsePropertyFlag(
   input: string,
   flagName: string,
-): PropertyFilter {
+): PropertyFlag {
   const colonIdx = input.indexOf(":")
   if (colonIdx === -1) {
     throw new Error(
@@ -24,16 +26,23 @@ export function parsePropertyFlag(
   }
 
   const rawValue = input.slice(colonIdx + 1)
-  return { key, value: parsePropertyValue(rawValue) }
+  return { key, value: parsePropertyValue(rawValue), raw: input }
 }
 
 export function parsePropertyFlags(
   inputs: string[] | undefined,
   flagName: string,
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-  for (const input of inputs ?? []) {
-    const { key, value } = parsePropertyFlag(input, flagName)
+): Record<string, PropertyValue> {
+  return flagsToRecord(
+    (inputs ?? []).map((input) => parsePropertyFlag(input, flagName)),
+  )
+}
+
+export function flagsToRecord(
+  flags: PropertyFlag[],
+): Record<string, PropertyValue> {
+  const result: Record<string, PropertyValue> = {}
+  for (const { key, value } of flags) {
     result[key] = value
   }
   return result
@@ -42,11 +51,11 @@ export function parsePropertyFlags(
 export function parsePropertyFilters(
   inputs: string[] | undefined,
   flagName: string,
-): PropertyFilter[] {
+): PropertyFlag[] {
   return (inputs ?? []).map((input) => parsePropertyFlag(input, flagName))
 }
 
-function parsePropertyValue(raw: string): unknown {
+function parsePropertyValue(raw: string): PropertyValue {
   try {
     const yamlScalar = yaml.parse(raw)
     if (typeof yamlScalar === "boolean") {

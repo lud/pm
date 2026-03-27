@@ -3,7 +3,7 @@ import { type ListOptions, listDocuments } from "../core/listing.js"
 import { parseDocumentRef } from "../core/scanner.js"
 import * as cli from "../lib/cli.js"
 import { loadProjectFrom } from "../lib/project.js"
-import { parsePropertyFilters } from "../lib/properties.js"
+import { parsePropertyFilters as parsePropertyFlags } from "../lib/properties.js"
 
 export const listCommand = command(
   {
@@ -71,7 +71,7 @@ export const listCommand = command(
     }
 
     try {
-      const propertyFilters = parsePropertyFilters(argv.flags.is, "--is")
+      const propertyFilters = parsePropertyFlags(argv.flags.is, "--is")
       if (propertyFilters.length > 0) {
         options.propertyFilters = propertyFilters
       }
