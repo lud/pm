@@ -19,10 +19,16 @@ export const doneCommand = command(
     }
 
     try {
-      const doc = markDone(project, id)
+      const { document, unblocked } = markDone(project, id)
       touchCurrent(project.projectDir)
-      const displayPath = formatPath(doc.path, process.cwd())
-      cli.success(`${displayPath} → ${doc.frontmatter.status}`)
+      const cwd = process.cwd()
+      const displayPath = formatPath(document.path, cwd)
+      cli.success(`${displayPath} → ${document.frontmatter.status}`)
+
+      for (const doc of unblocked) {
+        const unblockedPath = formatPath(doc.path, cwd)
+        cli.success(`${unblockedPath} → ${doc.frontmatter.status} (unblocked)`)
+      }
     } catch (err) {
       cli.abortError((err as Error).message)
     }

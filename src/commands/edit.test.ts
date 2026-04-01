@@ -212,4 +212,88 @@ describe("edit command", () => {
       ]),
     ).toThrow("Cannot combine --parent with --set parent")
   })
+
+  it("sets blocked_by with --blocked-by and --set status:blocked", () => {
+    const dir = setupMutableProject()
+
+    cli({ name: "pm", commands: [editCommand] }, undefined, [
+      "edit",
+      "4",
+      "--blocked-by",
+      "3",
+      "--set",
+      "status:blocked",
+    ])
+
+    const content = readFileSync(
+      join(
+        dir,
+        "context/features/001.feat.user-auth/004.task.session-store.md",
+      ),
+      "utf-8",
+    )
+    const { data } = parseFrontmatter(content)
+    expect(data.status).toBe("blocked")
+    expect(data.blocked_by).toBe("3.task.jwt-middleware")
+  })
+
+  it("aborts when --blocked-by is given without --set status", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [editCommand] }, undefined, [
+        "edit",
+        "4",
+        "--blocked-by",
+        "3",
+      ]),
+    ).toThrow("--blocked-by requires --set status")
+  })
+
+  it("aborts when --blocked-by status is not a blocked status", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [editCommand] }, undefined, [
+        "edit",
+        "4",
+        "--blocked-by",
+        "3",
+        "--set",
+        "status:in-progress",
+      ]),
+    ).toThrow(/not a blocked status/)
+  })
+
+  it("aborts when --blocked-by conflicts with --set blocked_by", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [editCommand] }, undefined, [
+        "edit",
+        "4",
+        "--blocked-by",
+        "3",
+        "--set",
+        "blocked_by:3",
+        "--set",
+        "status:blocked",
+      ]),
+    ).toThrow("Cannot combine --blocked-by with --set blocked_by:3")
+  })
+
+  it("aborts when --blocked-by references non-existent document", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [editCommand] }, undefined, [
+        "edit",
+        "4",
+        "--blocked-by",
+        "999",
+        "--set",
+        "status:blocked",
+      ]),
+    ).toThrow("Blocking document 999 not found")
+  })
 })

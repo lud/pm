@@ -1,6 +1,6 @@
 import type { ResolvedProject } from "../lib/project.js"
 import { type DocumentInfo, loadDocumentInfo } from "./documents.js"
-import { extractParentId } from "./parent-ref.js"
+import { parseFrontmatterId } from "./parent-ref.js"
 import { scanDocuments } from "./scanner.js"
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ function buildGraph(
     if (!doc.doctype.workflows && doc.id !== currentId) continue
 
     const status = doc.frontmatter.status as string | undefined
-    const parentId = extractParentId(doc.frontmatter.parent)
+    const parentId = parseFrontmatterId(doc.frontmatter.parent)
 
     const isDone =
       status !== undefined && doc.doctype.doneStatuses.includes(status)

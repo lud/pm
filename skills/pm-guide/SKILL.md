@@ -153,6 +153,7 @@ pm edit 003 --set status:waiting --set reason:"waiting on API"  # Set multiple p
 pm edit 003 --parent 002                     # Set/change parent
 pm done 003                                  # Mark as done (first done status)
 pm blocked 003                               # Mark as blocked (first blocked status)
+pm blocked 003 --by 002                      # Specify a blocker document
 pm current 003                               # Set document 003 as current
 ```
 

@@ -8,7 +8,7 @@ import {
 } from "../lib/frontmatter.js"
 import { mkdirSyncOrAbort, writeFileSyncOrAbort } from "../lib/fs-helpers.js"
 import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
-import { extractParentId, formatParentRef } from "./parent-ref.js"
+import { formatParentRef, parseFrontmatterId } from "./parent-ref.js"
 import {
   type DocumentFile,
   findDocumentById,
@@ -96,12 +96,12 @@ export function showDocument(
 
   // Walk up parent chain
   const parents: DocumentInfo[] = []
-  let currentParentId = extractParentId(doc.frontmatter.parent)
+  let currentParentId = parseFrontmatterId(doc.frontmatter.parent)
   while (currentParentId !== null) {
     const parent = readDocument(project, currentParentId)
     if (!parent) break
     parents.unshift(parent) // prepend so root is first
-    currentParentId = extractParentId(parent.frontmatter.parent)
+    currentParentId = parseFrontmatterId(parent.frontmatter.parent)
   }
 
   // Find children (requires full scan)
@@ -109,7 +109,7 @@ export function showDocument(
   for (const file of scanDocuments(project)) {
     if (file.id === id) continue
     const child = loadDocumentInfo(file)
-    if (extractParentId(child.frontmatter.parent) === id) {
+    if (parseFrontmatterId(child.frontmatter.parent) === id) {
       children.push(child)
     }
   }
@@ -276,7 +276,12 @@ export function editDocument(
 // Mark document as done
 // ---------------------------------------------------------------------------
 
-export function markDone(project: ResolvedProject, id: number): DocumentInfo {
+export type MarkDoneResult = {
+  document: DocumentInfo
+  unblocked: DocumentInfo[]
+}
+
+export function markDone(project: ResolvedProject, id: number): MarkDoneResult {
   const doc = readDocument(project, id)
   if (!doc) {
     throw new Error(`Document ${id} not found`)
@@ -289,9 +294,30 @@ export function markDone(project: ResolvedProject, id: number): DocumentInfo {
     )
   }
 
-  return editDocument(project, id, {
+  const document = editDocument(project, id, {
     setProperties: { status: doneStatus },
   })
+
+  // Scan for documents blocked by this one and unblock them
+  const unblocked: DocumentInfo[] = []
+  for (const file of scanDocuments(project)) {
+    if (file.id === id) continue
+    const info = loadDocumentInfo(file)
+    const blockedById = parseFrontmatterId(info.frontmatter.blocked_by)
+    if (blockedById !== id) continue
+
+    // Unblock: remove blocked_by and set status to defaultStatus
+    const content = readFileSync(info.path, "utf-8")
+    const { data, body } = parseFrontmatter(content)
+    delete data.blocked_by
+    data.status = info.doctype.defaultStatus
+    const newContent = prependFrontmatter(data, body)
+    writeFileSyncOrAbort(info.path, newContent)
+
+    unblocked.push(readDocument(project, file.id)!)
+  }
+
+  return { document, unblocked }
 }
 
 // ---------------------------------------------------------------------------
@@ -301,6 +327,7 @@ export function markDone(project: ResolvedProject, id: number): DocumentInfo {
 export function markBlocked(
   project: ResolvedProject,
   id: number,
+  options?: { blockedBy?: number },
 ): DocumentInfo {
   const doc = readDocument(project, id)
   if (!doc) {
@@ -314,9 +341,21 @@ export function markBlocked(
     )
   }
 
-  return editDocument(project, id, {
-    setProperties: { status: blockedStatus },
-  })
+  const setProperties: Record<string, unknown> = { status: blockedStatus }
+
+  if (options?.blockedBy !== undefined) {
+    const blockerDoc = readDocument(project, options.blockedBy)
+    if (!blockerDoc) {
+      throw new Error(`Blocking document ${options.blockedBy} not found`)
+    }
+    setProperties.blocked_by = formatParentRef(
+      blockerDoc.id,
+      blockerDoc.tag,
+      blockerDoc.slug,
+    )
+  }
+
+  return editDocument(project, id, { setProperties })
 }
 
 // ---------------------------------------------------------------------------

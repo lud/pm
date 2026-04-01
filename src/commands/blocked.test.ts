@@ -135,4 +135,75 @@ describe("blocked command", () => {
       ]),
     ).toThrow("Invalid document ID")
   })
+
+  it("sets blocked_by with --by flag", () => {
+    vi.clearAllMocks()
+    const { dir, project } = testProject.setup(BASIC_SETUP)
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    cli({ name: "pm", commands: [blockedCommand] }, undefined, [
+      "blocked",
+      "4",
+      "--by",
+      "3",
+    ])
+
+    const content = readFileSync(
+      join(
+        dir,
+        "context/features/001.feat.user-auth/004.task.session-store.md",
+      ),
+      "utf-8",
+    )
+    const { data } = parseFrontmatter(content)
+    expect(data.status).toBe("blocked")
+    expect(data.blocked_by).toBe("3.task.jwt-middleware")
+    expect(cliMod.info).not.toHaveBeenCalledWith(expect.stringContaining("Tip"))
+  })
+
+  it("prints tip when --by is not provided", () => {
+    vi.clearAllMocks()
+    const { dir, project } = testProject.setup(BASIC_SETUP)
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    cli({ name: "pm", commands: [blockedCommand] }, undefined, ["blocked", "4"])
+
+    expect(cliMod.info).toHaveBeenCalledWith(
+      "Tip: use --by <id> to reference the blocking document",
+    )
+  })
+
+  it("aborts on invalid --by ID", () => {
+    vi.clearAllMocks()
+    const { dir, project } = testProject.setup(BASIC_SETUP)
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    expect(() =>
+      cli({ name: "pm", commands: [blockedCommand] }, undefined, [
+        "blocked",
+        "4",
+        "--by",
+        "abc",
+      ]),
+    ).toThrow("Invalid document ID")
+  })
+
+  it("aborts when --by references non-existent document", () => {
+    vi.clearAllMocks()
+    const { dir, project } = testProject.setup(BASIC_SETUP)
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    expect(() =>
+      cli({ name: "pm", commands: [blockedCommand] }, undefined, [
+        "blocked",
+        "4",
+        "--by",
+        "999",
+      ]),
+    ).toThrow("Blocking document 999 not found")
+  })
 })

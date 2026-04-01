@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs"
 import { parseFrontmatter } from "../lib/frontmatter.js"
 import type { ResolvedDoctype, ResolvedProject } from "../lib/project.js"
 import type { PropertyFlag } from "../lib/properties.js"
-import { extractParentId } from "./parent-ref.js"
+import { parseFrontmatterId } from "./parent-ref.js"
 import { type DocumentFile, scanDocuments } from "./scanner.js"
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ export function listDocuments(
       result.frontmatter = data
       result.status = data.status as string | undefined
       result.title = typeof data.title === "string" ? data.title : undefined
-      result.parentId = extractParentId(data.parent)
+      result.parentId = parseFrontmatterId(data.parent)
     }
 
     if (!filterFn(result)) continue

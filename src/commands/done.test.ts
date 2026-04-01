@@ -127,4 +127,33 @@ describe("done command", () => {
       cli({ name: "pm", commands: [doneCommand] }, undefined, ["done", "abc"]),
     ).toThrow("Invalid document ID")
   })
+
+  it("prints unblocked documents", () => {
+    vi.clearAllMocks()
+    const { dir, project } = testProject.setup({
+      ...BASIC_SETUP,
+      files: {
+        ...BASIC_SETUP.files,
+        "context/features/001.feat.user-auth/004.task.session-store.md": {
+          parent: "2.spec.login-flow",
+          title: "Session store",
+          status: "blocked",
+          blocked_by: "3.task.jwt-middleware",
+          created_on: "2026-03-21",
+        },
+      },
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    // Mark doc 3 as done — should unblock doc 4
+    cli({ name: "pm", commands: [doneCommand] }, undefined, ["done", "3"])
+
+    // Should have two success calls: one for done doc, one for unblocked
+    expect(cliMod.success).toHaveBeenCalledTimes(2)
+    expect(cliMod.success).toHaveBeenCalledWith(expect.stringContaining("done"))
+    expect(cliMod.success).toHaveBeenCalledWith(
+      expect.stringContaining("unblocked"),
+    )
+  })
 })

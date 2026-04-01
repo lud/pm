@@ -1,6 +1,7 @@
 import { command } from "cleye"
 import { touchCurrent } from "../core/current.js"
-import { editDocument } from "../core/documents.js"
+import { editDocument, readDocument } from "../core/documents.js"
+import { formatParentRef } from "../core/parent-ref.js"
 import { parseDocumentRef } from "../core/scanner.js"
 import * as cli from "../lib/cli.js"
 import { formatPath } from "../lib/format.js"
@@ -20,6 +21,11 @@ export const editCommand = command(
         type: String,
         alias: "p",
         description: "Set parent document ID",
+      },
+      "blocked-by": {
+        type: String,
+        description:
+          "Set blocking document ID (requires --set status:<blocked-status>)",
       },
       set: {
         type: [String],
@@ -57,6 +63,52 @@ export const editCommand = command(
           `Cannot combine --parent with --set ${parentFlag.raw} on "edit"`,
         )
       }
+    }
+
+    // Handle --blocked-by
+    if (argv.flags["blocked-by"]) {
+      const blockedByFlag = flags.find((f) => f.key === "blocked_by")
+      if (blockedByFlag) {
+        cli.abortError(
+          `Cannot combine --blocked-by with --set ${blockedByFlag.raw}`,
+        )
+      }
+
+      const blockedById =
+        parseDocumentRef(argv.flags["blocked-by"]) ?? undefined
+      if (blockedById === undefined) {
+        cli.abortError(`Invalid document ID: "${argv.flags["blocked-by"]}"`)
+      }
+
+      // Require --set status:<blocked-status>
+      const doc = readDocument(project, id)
+      if (!doc) {
+        cli.abortError(`Document ${id} not found`)
+      }
+
+      const statusValue = properties.status
+      if (statusValue === undefined) {
+        cli.abortError(
+          `--blocked-by requires --set status:<status> with a blocked status`,
+        )
+      }
+
+      if (!doc.doctype.blockedStatuses.includes(String(statusValue))) {
+        cli.abortError(
+          `Status "${statusValue}" is not a blocked status for doctype "${doc.doctype.name}". Blocked statuses: ${doc.doctype.blockedStatuses.join(", ")}`,
+        )
+      }
+
+      // Resolve the blocking document to a ref string
+      const blockerDoc = readDocument(project, blockedById)
+      if (!blockerDoc) {
+        cli.abortError(`Blocking document ${blockedById} not found`)
+      }
+      properties.blocked_by = formatParentRef(
+        blockerDoc.id,
+        blockerDoc.tag,
+        blockerDoc.slug,
+      )
     }
 
     try {

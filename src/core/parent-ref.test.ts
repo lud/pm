@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
-  extractParentId,
   formatParentRef,
+  parseFrontmatterId,
   parseParentRef,
 } from "./parent-ref.js"
 
@@ -48,27 +48,27 @@ describe("parseParentRef", () => {
   })
 })
 
-describe("extractParentId", () => {
+describe("parseFrontmatterId", () => {
   it("extracts ID from string ref", () => {
-    expect(extractParentId("1.feat.user-auth")).toBe(1)
-    expect(extractParentId("42.spec.login")).toBe(42)
+    expect(parseFrontmatterId("1.feat.user-auth")).toBe(1)
+    expect(parseFrontmatterId("42.spec.login")).toBe(42)
   })
 
   it("extracts ID from legacy numeric value", () => {
-    expect(extractParentId(1)).toBe(1)
-    expect(extractParentId(42)).toBe(42)
+    expect(parseFrontmatterId(1)).toBe(1)
+    expect(parseFrontmatterId(42)).toBe(42)
   })
 
   it("returns null for zero or negative numbers", () => {
-    expect(extractParentId(0)).toBeNull()
-    expect(extractParentId(-1)).toBeNull()
+    expect(parseFrontmatterId(0)).toBeNull()
+    expect(parseFrontmatterId(-1)).toBeNull()
   })
 
   it("returns null for non-ref values", () => {
-    expect(extractParentId(null)).toBeNull()
-    expect(extractParentId(undefined)).toBeNull()
-    expect(extractParentId("invalid")).toBeNull()
-    expect(extractParentId(true)).toBeNull()
-    expect(extractParentId({})).toBeNull()
+    expect(parseFrontmatterId(null)).toBeNull()
+    expect(parseFrontmatterId(undefined)).toBeNull()
+    expect(parseFrontmatterId("invalid")).toBeNull()
+    expect(parseFrontmatterId(true)).toBeNull()
+    expect(parseFrontmatterId({})).toBeNull()
   })
 })

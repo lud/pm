@@ -40,7 +40,7 @@ export function parseParentRef(ref: string): ParentRef | null {
  * legacy numeric format (1) for backwards compatibility.
  * Returns null if the value is not a valid parent reference.
  */
-export function extractParentId(value: unknown): number | null {
+export function parseFrontmatterId(value: unknown): number | null {
   if (typeof value === "number" && value > 0) {
     return value
   }

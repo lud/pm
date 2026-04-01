@@ -9,8 +9,8 @@ import {
 import type { ResolvedProject } from "../lib/project.js"
 import type { Document } from "./documents.js"
 import {
-  extractParentId,
   formatParentRef,
+  parseFrontmatterId,
   parseParentRef,
 } from "./parent-ref.js"
 import { formatDocumentFilename, scanDocuments } from "./scanner.js"
@@ -73,7 +73,7 @@ function loadAllDocuments(project: ResolvedProject): DocumentEntry[] {
       ...file,
       frontmatter: data,
       body,
-      parentId: extractParentId(data.parent),
+      parentId: parseFrontmatterId(data.parent),
     }
   })
 }

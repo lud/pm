@@ -381,20 +381,20 @@ describe("editDocument", () => {
 describe("markDone", () => {
   it("sets status to first doneStatus for feature", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const doc = markDone(project, 1)
-    expect(doc.frontmatter.status).toBe("done")
+    const { document } = markDone(project, 1)
+    expect(document.frontmatter.status).toBe("done")
   })
 
   it("sets status to 'done' for spec", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const doc = markDone(project, 2)
-    expect(doc.frontmatter.status).toBe("done")
+    const { document } = markDone(project, 2)
+    expect(document.frontmatter.status).toBe("done")
   })
 
   it("sets status to 'done' for task", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const doc = markDone(project, 4)
-    expect(doc.frontmatter.status).toBe("done")
+    const { document } = markDone(project, 4)
+    expect(document.frontmatter.status).toBe("done")
   })
 
   it("throws for non-existent document", () => {
@@ -438,5 +438,120 @@ describe("markBlocked", () => {
       },
     })
     expect(() => markBlocked(project, 1)).toThrow(/no blocked statuses/)
+  })
+
+  it("sets blocked_by when blockedBy option is provided", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    const doc = markBlocked(project, 4, { blockedBy: 3 })
+    expect(doc.frontmatter.status).toBe("blocked")
+    expect(doc.frontmatter.blocked_by).toBe("3.task.jwt-middleware")
+  })
+
+  it("throws when blockedBy document does not exist", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    expect(() => markBlocked(project, 4, { blockedBy: 999 })).toThrow(
+      /Blocking document 999 not found/,
+    )
+  })
+
+  it("does not set blocked_by when blockedBy option is omitted", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    const doc = markBlocked(project, 4)
+    expect(doc.frontmatter.status).toBe("blocked")
+    expect(doc.frontmatter.blocked_by).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// markDone — unblocking
+// ---------------------------------------------------------------------------
+
+describe("markDone unblocking", () => {
+  it("unblocks documents blocked by the done document", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+
+    // Block doc 4 by doc 3
+    markBlocked(project, 4, { blockedBy: 3 })
+
+    // Mark doc 3 as done — should unblock doc 4
+    const { document, unblocked } = markDone(project, 3)
+    expect(document.frontmatter.status).toBe("done")
+    expect(unblocked).toHaveLength(1)
+    expect(unblocked[0].id).toBe(4)
+    expect(unblocked[0].frontmatter.status).toBe("new") // defaultStatus
+    expect(unblocked[0].frontmatter.blocked_by).toBeUndefined()
+  })
+
+  it("returns empty unblocked list when no documents are blocked", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    const { unblocked } = markDone(project, 4)
+    expect(unblocked).toHaveLength(0)
+  })
+
+  it("unblocks multiple documents", () => {
+    const { project } = testProject.setup({
+      pmJson: {
+        doctypes: {
+          feature: {
+            tag: "feat",
+            dir: "features",
+            intermediateDir: true,
+          },
+          task: { tag: "task", dir: ".", parent: "feature" },
+        },
+      },
+      files: {
+        "features/001.feat.infra/001.feat.infra.md": {
+          title: "Infrastructure",
+          status: "in-progress",
+        },
+        "features/001.feat.infra/002.task.api.md": {
+          parent: "1.feat.infra",
+          title: "API",
+          status: "blocked",
+          blocked_by: "1.feat.infra",
+        },
+        "features/001.feat.infra/003.task.ui.md": {
+          parent: "1.feat.infra",
+          title: "UI",
+          status: "blocked",
+          blocked_by: "1.feat.infra",
+        },
+      },
+    })
+
+    const { unblocked } = markDone(project, 1)
+    expect(unblocked).toHaveLength(2)
+    const ids = unblocked.map((d) => d.id).sort((a, b) => a - b)
+    expect(ids).toEqual([2, 3])
+    for (const doc of unblocked) {
+      expect(doc.frontmatter.status).toBe("new")
+      expect(doc.frontmatter.blocked_by).toBeUndefined()
+    }
+  })
+
+  it("skips documents with non-parseable blocked_by values", () => {
+    const { project } = testProject.setup({
+      pmJson: {
+        doctypes: {
+          feature: { tag: "feat", dir: "features" },
+        },
+      },
+      files: {
+        "features/001.feat.a.md": { title: "A", status: "new" },
+        "features/002.feat.b.md": {
+          title: "B",
+          status: "blocked",
+          blocked_by: "waiting for legal",
+        },
+      },
+    })
+
+    const { unblocked } = markDone(project, 1)
+    expect(unblocked).toHaveLength(0)
+    // Doc 2 should remain unchanged
+    const doc2 = readDocument(project, 2)!
+    expect(doc2.frontmatter.status).toBe("blocked")
+    expect(doc2.frontmatter.blocked_by).toBe("waiting for legal")
   })
 })
