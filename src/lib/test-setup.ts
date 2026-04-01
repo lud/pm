@@ -1,8 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { formatFrontmatter } from "./frontmatter.js"
 import { type ResolvedProject, resolveProject } from "./project.js"
 import { createTestWorkspace } from "./test-workspace.js"
+
+export type TestFileData = Record<string, unknown> & {
+  children?: Record<string, TestFileData>
+}
 
 export type TestSetup = {
   pmJson: {
@@ -10,7 +14,28 @@ export type TestSetup = {
     idMask?: string
   }
   pmCurrent?: number
-  files: Record<string, Record<string, unknown>>
+  files: Record<string, TestFileData>
+}
+
+function flattenFiles(
+  files: Record<string, TestFileData>,
+  parentId: number | undefined,
+  acc: Record<string, Record<string, unknown>>,
+): void {
+  for (const [path, entry] of Object.entries(files)) {
+    const { children, ...frontmatter } = entry
+
+    if (parentId !== undefined && !("parent" in frontmatter)) {
+      frontmatter.parent = parentId
+    }
+    acc[path] = frontmatter
+
+    if (children) {
+      const idStr = basename(path).match(/^0*(\d+)\./)?.[1]
+      const id = idStr !== undefined ? parseInt(idStr, 10) : undefined
+      flattenFiles(children, id, acc)
+    }
+  }
 }
 
 export type TestProject = {
@@ -45,7 +70,9 @@ export function createTestProject(label: string) {
       }
 
       // Write document files
-      for (const [relPath, frontmatter] of Object.entries(config.files)) {
+      const flat: Record<string, Record<string, unknown>> = {}
+      flattenFiles(config.files, undefined, flat)
+      for (const [relPath, frontmatter] of Object.entries(flat)) {
         const absPath = join(dir, relPath)
         mkdirSync(dirname(absPath), { recursive: true })
         writeFileSync(absPath, formatFrontmatter(frontmatter))

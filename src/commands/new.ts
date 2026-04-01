@@ -8,9 +8,9 @@ import { formatPath } from "../lib/format.js"
 import { loadProjectFrom } from "../lib/project.js"
 import {
   flagsToRecord,
-  parsePropertyFlag,
   type PropertyFlag,
   type PropertyValue,
+  parsePropertyFlag,
 } from "../lib/properties.js"
 
 const RESERVED_NEW_PROPERTIES: Record<string, (s: PropertyValue) => string> = {

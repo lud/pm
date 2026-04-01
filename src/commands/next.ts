@@ -1,3 +1,4 @@
+import { basename } from "node:path"
 import { command } from "cleye"
 import { getCurrentId } from "../core/current.js"
 import { readDocument } from "../core/documents.js"
@@ -39,9 +40,7 @@ export const nextCommand = command(
     }
 
     const fmtId = project.formatId
-    const onEvent = argv.flags.verbose
-      ? (e: TraversalEvent) => logEvent(e, fmtId)
-      : undefined
+    const onEvent = argv.flags.verbose ? makeVerboseLogger(fmtId) : undefined
 
     const result = findNextDocument(project, currentId, { onEvent })
 
@@ -50,32 +49,69 @@ export const nextCommand = command(
       return
     }
 
+    if (argv.flags.verbose) cli.writeln("")
+
     cli.info(formatDocumentHeader(result, process.cwd(), fmtId))
   },
 )
 
-function logEvent(e: TraversalEvent, fmtId: (id: number) => string) {
-  const msg = logMessage(e, fmtId)
-  if (msg) cli.info(msg)
+function makeVerboseLogger(
+  fmtId: (id: number) => string,
+): (e: TraversalEvent) => void {
+  const seenIds = new Set<number>()
+  const announcedChildIds = new Set<number>()
+
+  return (e: TraversalEvent) => {
+    const msg = formatEvent(e, fmtId, seenIds, announcedChildIds)
+    if (msg) cli.info(msg)
+  }
 }
 
-function logMessage(
+function formatEvent(
   e: TraversalEvent,
   fmtId: (id: number) => string,
+  seenIds: Set<number>,
+  announcedChildIds: Set<number>,
 ): string | undefined {
   switch (e.type) {
     case TraversalEventTypes.Start:
-      return `---\nDecision log:\n  Starting from current document ${fmtId(e.currentId)}`
-    case TraversalEventTypes.VisitSiblings:
-      return `  Looking for available siblings of ${fmtId(e.cursorId)}`
+      return undefined
+    case TraversalEventTypes.Inspect: {
+      const firstTime = !seenIds.has(e.documentId)
+      seenIds.add(e.documentId)
+      const filename = basename(e.document.path)
+      if (firstTime) {
+        const status = e.document.frontmatter.status as string | undefined
+        const statusStr = status !== undefined ? ` (${status})` : "(no status)"
+        return `inspect ${filename}${statusStr}`
+      }
+      return undefined
+    }
+    case TraversalEventTypes.VisitChildren: {
+      for (const id of e.childrenIds) announcedChildIds.add(id)
+      const ids = e.childrenIds.map(fmtId).join(", ")
+      const plural = e.childrenIds.length > 1
+      return `discovered ${e.childrenIds.length} child${plural ? "ren" : ""} under ${fmtId(e.documentId)}: ${ids}`
+    }
+    case TraversalEventTypes.VisitSiblings: {
+      const newSiblings = e.siblingsIds.filter(
+        (id) => !announcedChildIds.has(id),
+      )
+      if (newSiblings.length === 0) return undefined
+      const ids = newSiblings.map(fmtId).join(", ")
+      const plural = newSiblings.length > 1
+      return `discovered ${newSiblings.length} sibling${plural ? "s" : ""} of ${fmtId(e.documentId)}: ${ids}`
+    }
     case TraversalEventTypes.GoToParent:
-      return `  Moving to parent ${fmtId(e.parentId)}`
-    case TraversalEventTypes.VisitChildren:
-      return `  Looking for children under ${fmtId(e.cursorId)}`
-    case TraversalEventTypes.NoAvailableChildren:
-      return `  No available children under ${fmtId(e.cursorId)}`
-    case TraversalEventTypes.Found:
-      return `  Settled on ${fmtId(e.cursorId)}\n---`
-    default:
+      return undefined
+    case TraversalEventTypes.Found: {
+      const filename = basename(e.document.path)
+      const status = e.document.frontmatter.status as string | undefined
+      const statusStr = status !== undefined ? ` (${status})` : "(no status)"
+      return `found ${fmtId(e.documentId)} ${filename}${statusStr}`
+    }
+
+    case TraversalEventTypes.Exhausted:
+      return undefined
   }
 }

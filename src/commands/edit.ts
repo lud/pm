@@ -7,8 +7,8 @@ import { formatPath } from "../lib/format.js"
 import { loadProjectFrom } from "../lib/project.js"
 import {
   flagsToRecord,
-  parsePropertyFlag,
   type PropertyFlag,
+  parsePropertyFlag,
 } from "../lib/properties.js"
 
 export const editCommand = command(

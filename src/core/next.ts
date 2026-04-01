@@ -15,31 +15,53 @@ export type GraphNode = {
 }
 export enum TraversalEventTypes {
   Start = "Start",
+  Found = "Found",
+  Exhausted = "Exhausted",
+  Inspect = "Inspect",
+  VisitChildren = "VisitChildren",
   VisitSiblings = "VisitSiblings",
   GoToParent = "GoToParent",
-  VisitChildren = "VisitChildren",
-  Found = "Found",
-  NoAvailableChildren = "NoAvailableChildren",
-  Exhausted = "Exhausted",
 }
 
 export type TraversalEvent =
-  | { type: TraversalEventTypes.Start; currentId: number }
   | {
-      type: TraversalEventTypes.VisitSiblings
-      cursorId: number
-      parentId: number | null
-      candidates: number[]
+      type: TraversalEventTypes.Inspect
+      documentId: number
+      document: DocumentInfo
     }
-  | { type: TraversalEventTypes.GoToParent; from: number; parentId: number }
+  | {
+      type: TraversalEventTypes.Found
+      documentId: number
+      document: DocumentInfo
+    }
   | {
       type: TraversalEventTypes.VisitChildren
-      cursorId: number
-      candidates: number[]
+      documentId: number
+      childrenIds: number[]
     }
-  | { type: TraversalEventTypes.Found; cursorId: number }
-  | { type: TraversalEventTypes.NoAvailableChildren; cursorId: number }
+  | {
+      type: TraversalEventTypes.VisitSiblings
+      documentId: number
+      siblingsIds: number[]
+    }
+  | {
+      type: TraversalEventTypes.GoToParent
+      documentId: number
+      parentId: number
+    }
   | { type: TraversalEventTypes.Exhausted }
+  | {
+      type: Exclude<
+        TraversalEventTypes,
+        | TraversalEventTypes.Inspect
+        | TraversalEventTypes.VisitChildren
+        | TraversalEventTypes.VisitSiblings
+        | TraversalEventTypes.GoToParent
+        | TraversalEventTypes.Exhausted
+        | TraversalEventTypes.Found
+      >
+      documentId: number
+    }
 
 export type NextOptions = {
   onEvent?: (event: TraversalEvent) => void
@@ -97,30 +119,65 @@ function buildGraph(
 // Core algorithm
 // ---------------------------------------------------------------------------
 
+function getParentChain(
+  nodes: Map<number, GraphNode>,
+  nodeId: number,
+): number[] {
+  let cursorId: number | null | undefined = nodeId
+  const stack: number[] = []
+  while (cursorId && nodes.has(cursorId)) {
+    const node = nodes.get(cursorId)
+    stack.unshift(cursorId)
+    cursorId = node?.parentId
+  }
+  return stack
+}
+
 function getSiblings(
   nodes: Map<number, GraphNode>,
   cursorId: number,
   parentId: number | null,
+  closedList: Set<number>,
+  seenSiblings: Set<number>,
 ): number[] {
   if (parentId === null) {
     // Root level: siblings are all root nodes
     const roots: number[] = []
     for (const node of nodes.values()) {
-      if (node.parentId === null && node.document.id !== cursorId) {
+      if (
+        node.parentId === null &&
+        node.document.id !== cursorId &&
+        !closedList.has(node.document.id)
+      ) {
         roots.push(node.document.id)
       }
     }
     return roots.sort((a, b) => a - b)
+  } else {
+    const parent = nodes.get(parentId)
+    if (!parent) return []
+    return parent.children
+      .filter(
+        (id) => !closedList.has(id) && !seenSiblings.has(id) && id !== cursorId,
+      )
+      .sort((a, b) => a - b)
   }
-
-  const parent = nodes.get(parentId)
-  if (!parent) return []
-  return parent.children.filter((id) => id !== cursorId).sort((a, b) => a - b)
 }
 
-function isLeaf(nodes: Map<number, GraphNode>, id: number): boolean {
-  const node = nodes.get(id)
-  return node !== undefined && node.children.length === 0
+function getChildrenIds(
+  nodes: Map<number, GraphNode>,
+  parentId: number,
+  ignoreSet: Set<number>,
+) {
+  const parent = nodes.get(parentId)
+  if (!parent) return []
+  return parent.children
+    .filter((id) => !ignoreSet.has(id))
+    .sort((a, b) => a - b)
+}
+
+function isLeaf(node: GraphNode): boolean {
+  return node.children.length === 0
 }
 
 export function findNextDocument(
@@ -130,89 +187,104 @@ export function findNextDocument(
 ): DocumentInfo | null {
   const emit = options.onEvent ?? (() => {})
   const nodes = buildGraph(project, currentId)
-  const visited = new Set<number>()
+  const stack = getParentChain(nodes, currentId)
+  const closedList: Set<number> = new Set()
+  const seenSiblings: Set<number> = new Set()
+  const cursorIndex = 0
 
-  const currentNode = nodes.get(currentId)
-  if (!currentNode) {
-    return null
-  }
+  const ctx = { stack, nodes, emit, cursorIndex, closedList, seenSiblings }
 
-  emit({ type: TraversalEventTypes.Start, currentId })
-  visited.add(currentId)
+  ctx.emit({ type: TraversalEventTypes.Start, documentId: currentId })
 
-  let cursorId = currentId
+  while (stack.length) {
+    const cursorId = stack[stack.length - 1]
 
-  // Main loop: find siblings, then drill into children or go up
-  while (true) {
-    const cursor = nodes.get(cursorId)!
-    const parentId = cursor.parentId
-
-    // Step 2: get available siblings
-    const siblings = getSiblings(nodes, cursorId, parentId)
-    const availableSiblings = siblings.filter(
-      (id) => !visited.has(id) && nodes.get(id)!.isAvailable,
-    )
-
-    emit({
-      type: TraversalEventTypes.VisitSiblings,
-      cursorId,
-      parentId,
-      candidates: availableSiblings,
-    })
-
-    if (availableSiblings.length === 0) {
-      // Step 3a: no sibling → go to parent
-      if (parentId === null) {
-        // We're at root level with no siblings → exhausted
-        emit({ type: TraversalEventTypes.Exhausted })
-        return null
-      }
-
-      emit({ type: TraversalEventTypes.GoToParent, from: cursorId, parentId })
-      // Don't add parent to visited — we're just passing through
-      cursorId = parentId
+    if (ctx.closedList.has(cursorId)) {
+      stack.pop()
       continue
     }
 
-    // Step 3b: pick first available sibling
-    cursorId = availableSiblings[0]
-    visited.add(cursorId)
+    const node = ctx.nodes.get(cursorId)
+    if (!node) {
+      continue // this should never happen
+    }
 
-    // Step 4/5/6: drill into children until we find a leaf
-    while (true) {
-      if (isLeaf(nodes, cursorId)) {
-        // Step 4a: leaf found → return it
-        emit({ type: TraversalEventTypes.Found, cursorId: cursorId })
-        const node = nodes.get(cursorId)!
-        return node.document
-      }
+    ctx.emit({
+      type: TraversalEventTypes.Inspect,
+      documentId: cursorId,
+      document: node.document,
+    })
 
-      // Has children — find available ones
-      const childNode = nodes.get(cursorId)!
-      const availableChildren = childNode.children.filter(
-        (id) => !visited.has(id) && nodes.get(id)!.isAvailable,
-      )
-
-      emit({
+    const childrenIds = getChildrenIds(ctx.nodes, cursorId, ctx.closedList)
+    if (childrenIds.length) {
+      ctx.emit({
         type: TraversalEventTypes.VisitChildren,
-        cursorId,
-        candidates: availableChildren,
+        documentId: cursorId,
+        childrenIds,
+      })
+      addNewStack(ctx.stack, childrenIds.slice().reverse(), ctx.closedList)
+      continue
+    }
+
+    ctx.closedList.add(cursorId)
+    stack.pop()
+
+    // No children of any status at this point. If there were children this is reached on the second iteration.
+    if (node.isAvailable && isLeaf(node) && cursorId !== currentId) {
+      ctx.emit({
+        type: TraversalEventTypes.Found,
+        documentId: cursorId,
+        document: node.document,
+      })
+      return node.document
+    }
+
+    const siblingsIds = getSiblings(
+      ctx.nodes,
+      cursorId,
+      node.parentId,
+      ctx.closedList,
+      ctx.seenSiblings,
+    )
+
+    if (siblingsIds.length) {
+      ctx.emit({
+        type: TraversalEventTypes.VisitSiblings,
+        documentId: cursorId,
+        siblingsIds,
       })
 
-      if (availableChildren.length > 0) {
-        // Step 6a: drill into first available child
-        cursorId = availableChildren[0]
-        visited.add(cursorId)
-        continue
+      for (const id of siblingsIds) {
+        seenSiblings.add(id)
       }
 
-      // Step 6b: cursor is a non-leaf with no available children → dead end
-      emit({
-        type: TraversalEventTypes.NoAvailableChildren,
-        cursorId,
+      addNewStack(
+        ctx.stack,
+        // reverse to read from stack in order
+        siblingsIds.slice().reverse(),
+        ctx.closedList,
+      )
+    }
+    if (
+      typeof stack[stack.length - 1] === "number" &&
+      stack[stack.length - 1] === node.parentId
+    ) {
+      ctx.emit({
+        type: TraversalEventTypes.GoToParent,
+        documentId: cursorId,
+        parentId: node.parentId,
       })
-      // Break inner loop to go back to step 2 (find siblings of cursor)
-      break
+    }
+  }
+
+  ctx.emit({ type: TraversalEventTypes.Exhausted })
+  return null
+}
+
+function addNewStack(stack: number[], ids: number[], closedList: Set<number>) {
+  for (const id of ids) {
+    if (!closedList.has(id) && !stack.includes(id)) {
+      stack.push(id)
     }
   }
 }
