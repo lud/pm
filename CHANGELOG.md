@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-04-01
+
+### 🚀 Features
+
+- Added ability to hide doctype from pm next
+- Better error output for reserved properties
+- New next verbose output format
+
+### 📚 Documentation
+
+- Tell agents how to read a full context
+
 ## [0.7.0] - 2026-03-25
 
 ### 🚀 Features
