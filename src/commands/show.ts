@@ -60,8 +60,12 @@ function formatDocLine(
 export function formatParentsList(
   parents: DocumentInfo[],
   formatId: (id: number) => string,
+  missingParent?: number,
 ): string {
   const lines = ["Parents:"]
+  if (missingParent !== undefined) {
+    lines.push(`  ${formatId(missingParent)} (not found)`)
+  }
   for (const parent of parents) {
     lines.push(formatDocLine(parent, formatId))
   }
@@ -80,12 +84,12 @@ export function formatChildrenList(
 }
 
 export function displayDocumentRelations(
-  result: Pick<ShowResult, "parents" | "children">,
+  result: Pick<ShowResult, "parents" | "children" | "missingParent">,
   formatId: (id: number) => string,
 ): void {
-  if (result.parents.length > 0) {
+  if (result.parents.length > 0 || result.missingParent !== undefined) {
     cli.info("")
-    cli.info(formatParentsList(result.parents, formatId))
+    cli.info(formatParentsList(result.parents, formatId, result.missingParent))
   }
   if (result.children.length > 0) {
     cli.info("")

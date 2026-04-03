@@ -13,28 +13,28 @@ describe("parseFrontmatter", () => {
     const content = "---\ntitle: Hello\nstatus: new\n---\nBody text"
     const result = parseFrontmatter(content)
     expect(result.data).toEqual({ title: "Hello", status: "new" })
-    expect(result.body).toBe("Body text")
+    expect(result.bodyWithoutFM()).toBe("Body text")
   })
 
   it("returns empty data for content without frontmatter", () => {
     const content = "Just some text"
     const result = parseFrontmatter(content)
     expect(result.data).toEqual({})
-    expect(result.body).toBe("Just some text")
+    expect(result.bodyWithoutFM()).toBe("Just some text")
   })
 
   it("handles empty frontmatter", () => {
     const content = "---\n---\nBody"
     const result = parseFrontmatter(content)
     expect(result.data).toEqual({})
-    expect(result.body).toBe("Body")
+    expect(result.bodyWithoutFM()).toBe("Body")
   })
 
   it("handles frontmatter with no trailing content", () => {
     const content = "---\ntitle: Test\n---"
     const result = parseFrontmatter(content)
     expect(result.data).toEqual({ title: "Test" })
-    expect(result.body).toBe("")
+    expect(result.bodyWithoutFM()).toBe("")
   })
 
   it("handles numeric values", () => {
@@ -76,7 +76,7 @@ describe("setFrontmatterProperty", () => {
     const parsed = parseFrontmatter(result)
     expect(parsed.data.status).toBe("done")
     expect(parsed.data.title).toBe("Old")
-    expect(parsed.body).toBe("Body")
+    expect(parsed.bodyWithoutFM()).toBe("Body")
   })
 
   it("adds a new property", () => {
@@ -98,6 +98,6 @@ describe("setFrontmatterProperties", () => {
     const parsed = parseFrontmatter(result)
     expect(parsed.data.status).toBe("done")
     expect(parsed.data.title).toBe("New")
-    expect(parsed.body).toBe("Body")
+    expect(parsed.bodyWithoutFM()).toBe("Body")
   })
 })

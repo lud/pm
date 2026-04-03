@@ -1,5 +1,6 @@
 import { cli } from "cleye"
 import { blockedCommand } from "./commands/blocked.js"
+import { contextCommand } from "./commands/context.js"
 import { currentCommand } from "./commands/current.js"
 import { runDefaultCommand } from "./commands/default.js"
 import { doneCommand } from "./commands/done.js"
@@ -23,6 +24,7 @@ const argv = cli({
     newCommand,
     listCommand,
     readCommand,
+    contextCommand,
     editCommand,
     doneCommand,
     blockedCommand,

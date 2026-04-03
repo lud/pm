@@ -6,12 +6,13 @@ export type FrontmatterData = Record<string, unknown>
 
 export function parseFrontmatter(content: string): {
   data: FrontmatterData
-  body: string
+  bodyWithoutFM: () => string
+  bodyRaw: string
 } {
   const match = FM_REGEX.exec(content)
-  if (!match) return { data: {}, body: content }
+  if (!match)
+    return { data: {}, bodyRaw: content, bodyWithoutFM: () => content }
   const data = (yaml.parse(match[1]) as Record<string, unknown>) ?? {}
-  const body = content.slice(match[0].length)
 
   // Normalize well-known fields so consumers don't need runtime type guards
   if ("status" in data && typeof data.status !== "string") {
@@ -25,7 +26,11 @@ export function parseFrontmatter(content: string): {
     delete data.parent
   }
 
-  return { data, body }
+  return {
+    data,
+    bodyWithoutFM: () => content.slice(match[0].length),
+    bodyRaw: content,
+  }
 }
 
 export function hasFrontmatter(content: string): boolean {
@@ -48,14 +53,14 @@ export function setFrontmatterProperty(
   key: string,
   value: unknown,
 ): string {
-  const { data, body } = parseFrontmatter(content)
-  return prependFrontmatter({ ...data, [key]: value }, body)
+  const { data, bodyWithoutFM } = parseFrontmatter(content)
+  return prependFrontmatter({ ...data, [key]: value }, bodyWithoutFM())
 }
 
 export function setFrontmatterProperties(
   content: string,
   properties: Record<string, unknown>,
 ): string {
-  const { data, body } = parseFrontmatter(content)
-  return prependFrontmatter({ ...data, ...properties }, body)
+  const { data, bodyWithoutFM } = parseFrontmatter(content)
+  return prependFrontmatter({ ...data, ...properties }, bodyWithoutFM())
 }

@@ -68,11 +68,12 @@ function loadAllDocuments(project: ResolvedProject): DocumentEntry[] {
   const files = [...scanDocuments(project)]
   return files.map((file) => {
     const content = readFileSync(file.path, "utf-8")
-    const { data, body } = parseFrontmatter(content)
+    const { data, bodyRaw, bodyWithoutFM } = parseFrontmatter(content)
     return {
       ...file,
       frontmatter: data,
-      body,
+      bodyRaw,
+      bodyWithoutFM,
       parentId: parseFrontmatterId(data.parent),
     }
   })
@@ -400,9 +401,9 @@ export function applyTidyPlan(plan: TidyPlan): void {
   // 1. Edit files first (at their current paths)
   for (const edit of plan.edits) {
     const content = readFileSync(edit.path, "utf-8")
-    const { data, body } = parseFrontmatter(content)
+    const { data, bodyWithoutFM } = parseFrontmatter(content)
     data.parent = edit.newParentRef
-    const newContent = prependFrontmatter(data, body)
+    const newContent = prependFrontmatter(data, bodyWithoutFM())
     writeFileSyncOrAbort(edit.path, newContent)
   }
 
@@ -436,9 +437,9 @@ export function resolveOrphan(
   // 1. Write parent ref to frontmatter
   const parentRef = formatParentRef(parent.id, parent.tag, parent.slug)
   const content = readFileSync(orphan.path, "utf-8")
-  const { data, body } = parseFrontmatter(content)
+  const { data, bodyWithoutFM } = parseFrontmatter(content)
   data.parent = parentRef
-  const newContent = prependFrontmatter(data, body)
+  const newContent = prependFrontmatter(data, bodyWithoutFM())
   writeFileSyncOrAbort(orphan.path, newContent)
 
   // 2. Compute expected path

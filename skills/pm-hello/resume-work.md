@@ -14,8 +14,8 @@ If there is **no current document**, list not-done features with
 `pm list --type feature` and ask the user which one to work on. Stop here until they
 choose.
 
-If there **is** a current document, read it with `pm read <id>` and proceed to
-Step 2.
+If there **is** a current document, read it with all its parent documents context with `pm
+context <id>` and proceed to Step 2.
 
 ## Step 2 — Evaluate the current document
 

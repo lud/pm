@@ -157,4 +157,39 @@ describe("show command", () => {
       cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "abc"]),
     ).toThrow("Invalid document ID")
   })
+
+  it("displays missing parent in parent chain", () => {
+    const setup = testProject.setup({
+      pmJson: {
+        doctypes: {
+          feature: {
+            tag: "feat",
+            dir: "context/features",
+            intermediateDir: true,
+          },
+          spec: { tag: "spec", dir: ".", parent: "feature" },
+        },
+      },
+      files: {
+        "context/features/002.feat.ghost/002.feat.ghost.md": {
+          title: "Ghost feature",
+          status: "new",
+          parent: "999.feat.missing",
+        },
+      },
+    })
+    vi.mocked(loadProjectFrom).mockReturnValue(setup.project)
+    vi.spyOn(process, "cwd").mockReturnValue(setup.dir)
+
+    cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "2"])
+    expect(infoOutput()).toBe(
+      dedent(`
+      002 feature Ghost feature (new)
+      in context/features/002.feat.ghost/002.feat.ghost.md
+
+      Parents:
+        999 (not found)
+      `),
+    )
+  })
 })

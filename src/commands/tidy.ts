@@ -107,11 +107,12 @@ export const tidyCommand = command(
           .filter((d) => d.doctype.name === expectedParentDoctype)
           .map((d) => {
             const content = readFileSync(d.path, "utf-8")
-            const { data, body } = parseFrontmatter(content)
+            const { data, bodyRaw, bodyWithoutFM } = parseFrontmatter(content)
             return {
               ...d,
               frontmatter: data,
-              body,
+              bodyRaw,
+              bodyWithoutFM,
               parentId: null,
             } as DocumentEntry
           })

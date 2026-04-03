@@ -36,14 +36,23 @@ export type DocumentInfo = DocumentFile & {
  * Use DocumentInfo when the body is not needed.
  */
 export type Document = DocumentInfo & {
-  body: string
+  bodyRaw: string
+  bodyWithoutFM: () => string
 }
 
 export type ShowResult = {
   document: DocumentInfo
   parents: DocumentInfo[]
   children: DocumentInfo[]
+  missingParent?: number
 }
+
+export type UnresolvedDocument = {
+  resolved: false
+  id: number
+}
+
+export type ChainEntry = Document | UnresolvedDocument
 
 export type CreateResult = {
   id: number
@@ -75,11 +84,12 @@ export function loadDocumentInfo(file: DocumentFile): DocumentInfo {
 
 export function loadDocument(file: DocumentFile): Document {
   const content = readFileSync(file.path, "utf-8")
-  const { data, body } = parseFrontmatter(content)
+  const { data, bodyRaw, bodyWithoutFM } = parseFrontmatter(content)
   return {
     ...file,
     frontmatter: data,
-    body,
+    bodyRaw,
+    bodyWithoutFM,
   }
 }
 
@@ -96,10 +106,14 @@ export function showDocument(
 
   // Walk up parent chain
   const parents: DocumentInfo[] = []
+  let missingParent: number | undefined
   let currentParentId = parseFrontmatterId(doc.frontmatter.parent)
   while (currentParentId !== null) {
     const parent = readDocument(project, currentParentId)
-    if (!parent) break
+    if (!parent) {
+      missingParent = currentParentId
+      break
+    }
     parents.unshift(parent) // prepend so root is first
     currentParentId = parseFrontmatterId(parent.frontmatter.parent)
   }
@@ -114,7 +128,37 @@ export function showDocument(
     }
   }
 
-  return { document: doc, parents, children }
+  return { document: doc, parents, children, missingParent }
+}
+
+// ---------------------------------------------------------------------------
+// Document chain: document + parents (frontmatter only, content read separately)
+// ---------------------------------------------------------------------------
+
+export function documentChain(
+  project: ResolvedProject,
+  id: number,
+): ChainEntry[] | null {
+  const file = findDocumentById(project, id)
+  if (!file) return null
+
+  const doc = loadDocument(file)
+
+  // Walk up parent chain
+  const chain: ChainEntry[] = [doc]
+  let currentParentId = parseFrontmatterId(doc.frontmatter.parent)
+  while (currentParentId !== null) {
+    const parentFile = findDocumentById(project, currentParentId)
+    if (!parentFile) {
+      chain.unshift({ resolved: false, id: currentParentId })
+      break
+    }
+    const parent = loadDocument(parentFile)
+    chain.unshift(parent)
+    currentParentId = parseFrontmatterId(parent.frontmatter.parent)
+  }
+
+  return chain
 }
 
 // ---------------------------------------------------------------------------
@@ -308,10 +352,10 @@ export function markDone(project: ResolvedProject, id: number): MarkDoneResult {
 
     // Unblock: remove blocked_by and set status to defaultStatus
     const content = readFileSync(info.path, "utf-8")
-    const { data, body } = parseFrontmatter(content)
+    const { data, bodyWithoutFM } = parseFrontmatter(content)
     delete data.blocked_by
     data.status = info.doctype.defaultStatus
-    const newContent = prependFrontmatter(data, body)
+    const newContent = prependFrontmatter(data, bodyWithoutFM())
     writeFileSyncOrAbort(info.path, newContent)
 
     unblocked.push(readDocument(project, file.id)!)

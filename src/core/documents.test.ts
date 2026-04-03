@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest"
 import { parseFrontmatter } from "../lib/frontmatter.js"
 import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 import {
+  type ChainEntry,
+  type Document,
   createDocument,
+  documentChain,
   editDocument,
   loadDocument,
   markBlocked,
@@ -81,7 +84,7 @@ describe("readDocument", () => {
 
     const file = findDocumentById(project, 1)!
     const doc = loadDocument(file)
-    expect(doc.body).toContain("Feature for user authentication")
+    expect(doc.bodyWithoutFM()).toContain("Feature for user authentication")
   })
 
   it("does not include id in frontmatter", () => {
@@ -171,6 +174,100 @@ describe("showDocument", () => {
   it("returns null for non-existent document", () => {
     const { project } = testProject.setup(BASIC_SETUP)
     expect(showDocument(project, 999)).toBeNull()
+  })
+
+  it("records missingParent when a parent is not found", () => {
+    const { project } = testProject.setup({
+      pmJson: {
+        doctypes: {
+          feature: {
+            tag: "feat",
+            dir: "features",
+            intermediateDir: true,
+          },
+          spec: { tag: "spec", dir: ".", parent: "feature" },
+        },
+      },
+      files: {
+        "features/002.feat.orphan/002.feat.orphan.md": {
+          title: "Orphan",
+          status: "new",
+          parent: "999.feat.gone",
+        },
+      },
+    })
+    const result = showDocument(project, 2)
+    expect(result).not.toBeNull()
+    expect(result!.missingParent).toBe(999)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// documentChain
+// ---------------------------------------------------------------------------
+
+function isResolved(entry: ChainEntry): entry is Document {
+  return !("resolved" in entry && entry.resolved === false)
+}
+
+describe("documentChain", () => {
+  it("returns chain with all parents for a leaf document", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+
+    const chain = documentChain(project, 3)
+    expect(chain).not.toBeNull()
+    expect(chain).toHaveLength(3)
+    // All resolved
+    expect(chain!.every(isResolved)).toBe(true)
+    // Order: root first
+    const docs = chain as Document[]
+    expect(docs[0].id).toBe(1)
+    expect(docs[1].id).toBe(2)
+    expect(docs[2].id).toBe(3)
+  })
+
+  it("returns single-element chain for a root document", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    const chain = documentChain(project, 1)
+    expect(chain).toHaveLength(1)
+    expect(isResolved(chain![0])).toBe(true)
+    expect((chain![0] as Document).id).toBe(1)
+  })
+
+  it("returns null for non-existent document", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    expect(documentChain(project, 999)).toBeNull()
+  })
+
+  it("includes UnresolvedDocument when parent is missing", () => {
+    const { project } = testProject.setup({
+      pmJson: {
+        doctypes: {
+          feature: {
+            tag: "feat",
+            dir: "features",
+            intermediateDir: true,
+          },
+          spec: { tag: "spec", dir: ".", parent: "feature" },
+        },
+      },
+      files: {
+        "features/002.feat.orphan/002.feat.orphan.md": {
+          title: "Orphan",
+          status: "new",
+          parent: "999.feat.gone",
+        },
+      },
+    })
+    const chain = documentChain(project, 2)
+    expect(chain).not.toBeNull()
+    expect(chain).toHaveLength(2)
+    // First entry is unresolved
+    expect(isResolved(chain![0])).toBe(false)
+    expect(chain![0]).toEqual({ resolved: false, id: 999 })
+    // Second entry is the document itself
+    expect(isResolved(chain![1])).toBe(true)
+    expect((chain![1] as Document).id).toBe(2)
   })
 })
 

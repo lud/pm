@@ -123,8 +123,9 @@ pm list --all-statuses     # List all documents regardless of status
 pm list --parent 001       # List direct children of document 001
 pm list --status waiting --is owner:alice  # Filter by exact status and property
 pm list --is priority:2    # Filter by numeric custom property
-pm show 003                # Show document 003 title, status, path, parents and children
+pm context 003             # Show document details + full raw content of 003 and all its parents
 pm read 003                # Print full file contents of document 003
+pm show 003                # Show document 003 title, status, path, parents and children
 pm current                 # Show the current document and its parents/children if any
 pm which                   # Print project directory path
 pm which 003               # Print path to document 003
@@ -199,10 +200,11 @@ direct children of a document), filtering out done and blocked documents.
 ## Tips for agents
 
 - Always start by running `pm status` to understand the project state.
-- To get the full context of a document, use `pm show <id>` to understand a
-  document's position in the hierarchy and see the ID of all parents. Then read
-  each one in order with `pm read <id>`. Topmost parent is listed first.
-- When creating specs or tasks, always provide the `-p` flag with the parent ID.
+- To get the full context of a document, use `pm context <id>`. It prints the
+  document's hierarchy (like `pm show`) followed by the raw file contents
+  (including frontmatter) of every parent and the document itself, from topmost
+  parent down. This is the fastest way to load all relevant context in one call.
+- When creating specs or tasks, always provide the `--parent` flag with the parent ID.
 - When editing frontmatter directly, you may set `parent` to just the numeric ID
   like `1` as a shorthand, but the full `{id}.{tag}.{slug}` form is also valid
   and is the usual canonical format.
