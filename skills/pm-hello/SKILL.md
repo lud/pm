@@ -5,102 +5,89 @@ description:
   check project status, resume work on the current document, or find the next
   thing to do. Use this whenever the user asks where work stands, what to do
   next, to continue work, to resume a session, for project status, or invokes
-  /pm-hello.
+  /pm-hello. Also use it when the user describes specific work they want to do
+  (a feature, spec, task, or other deliverable) to check whether it is already
+  tracked.
 user-invocable: true
 ---
 
 # PM Hello — Session Bootstrap
 
-This skill bootstraps a working session. It figures out where work was left off,
-evaluates the current document, and either continues work or finds the next
-thing to do.
+**Always start:** load the `pm-guide` skill for command reference and concept
+definitions used throughout this workflow.
 
-**Prerequisite:** auto-load the `pm-guide` skill for command reference and
-concept definitions used throughout this workflow.
+Then choose a mode based on how the skill was invoked.
 
-## Step 1 — Orient
+---
 
-```bash
-pm status
-pm current
-```
+## Mode A — Resume work
 
-If there is **no current document**, list not-done features with
-`pm list --type feature` and ask the user which one to work on. Stop here until they
-choose.
+Use this when the user wants to continue from where they left off, with no
+specific work described (e.g. "what's next?", "resume", "where were we?").
 
-If there **is** a current document, read it with `pm read <id>` and proceed to
-Step 2.
+Read [resume-work.md](resume-work.md) and follow its steps.
 
-## Step 2 — Evaluate the current document
+---
 
-Based on the doctype and status of the current document, follow the appropriate
-branch below.
+## Mode B — Specific work described
 
-### Task
+Use this when the user describes a concrete piece of work they want to do — a
+feature, spec, task, or any other deliverable — and you need to find out whether
+it is already tracked.
 
-- **Active:** Examine the codebase to determine whether the work described in
-  the task is already implemented. Report your findings to the user.
-  - If the work appears complete, tell the user and ask for confirmation.
-  - If the work is incomplete, summarize what is missing or still needed.
-- **Blocked:** Tell the user what document is blocked and why (read the
-  frontmatter for context). Ask if the blocker has been resolved. If yes,
-  unblock it with `pm edit <id> --set status:in-progress` and continue. If no,
-  proceed to Step 3 (find next work).
-- **Done:** Proceed to Step 3 (find next work).
+### 1 — Search existing documents
 
-### Spec
-
-- **Done:** Proceed to Step 3 (find next work).
-- **Blocked:** Same as blocked task — report the blocker, ask if resolved, and
-  either unblock or proceed to Step 3.
-- **Active (including `specified`):** Check for child tasks with
-  `pm show <id>`.
-  - If tasks exist, pick the first active task — go to Step 2 with that task
-    (set it as current first). Skip blocked and done tasks.
-  - If no tasks exist, treat the spec as active implementation guidance: read
-    it, summarize intent, and either start implementing directly or ask the
-    user whether to split it into tasks first.
-
-### Feature
-
-- **Active:** Read the feature content. Provide a summary and check for child
-  specs with `pm show <id>`.
-  - If no specs exist, suggest starting the specification work — propose specs
-    and ask for confirmation.
-  - If active specs exist, pick the first one — go to Step 2 with that spec
-    (set it as current first).
-  - If all specs are done, check implementation across the codebase. If
-    everything looks complete, tell the user and ask for confirmation to mark
-    the feature as done.
-- **Blocked:** Same as blocked task — report the blocker, ask if resolved, and
-  either unblock or proceed to Step 3.
-- **Done:** Proceed to Step 3 (find next work).
-
-## Step 3 — Find next work
-
-When the current document is done, blocked, or otherwise not actionable, use
-`pm next` to find the next workable document. It traverses the hierarchy
-starting from the current document, looking for the nearest available leaf
-(siblings first, then up to parent siblings, drilling down into children).
+List active and blocked documents:
 
 ```bash
-pm next
+pm list
 ```
 
-If `pm next` finds a document, set it as current with `pm current <id>` and go
-back to Step 2 to evaluate it.
+List blocked documents:
 
-If `pm next` reports nothing left, congratulate the user — all work is done or
-blocked.
+```bash
+pm list --blocked
+```
 
-## Marking documents as done or blocked
+Scan both outputs for documents whose title or content matches the user's
+described work.
 
-When the user confirms that work is finished (e.g. "ok that is done", "yes let's
-move on"), mark the document with `pm done <id>` before proceeding to Step 3.
+### 2 — Act on the result
 
-When work cannot proceed due to a dependency or external blocker, mark the
-document with `pm blocked <id>` before proceeding to Step 3.
+**Exact match found** — a document of the right doctype matches the described
+work: read it with `pm read <id>` to confirm intent, set it as current with
+`pm current <id>`, then evaluate it following the doctype/status rules in
+[resume-work.md](resume-work.md) (Step 2 onwards).
 
-Do **not** batch-update statuses during traversal — only mark a document as done
-or blocked when it has been individually evaluated and confirmed.
+**Partial/parent match found** — a document of a *higher* doctype matches (e.g.
+the user wants to implement a task but a spec or feature exists that covers the
+same area): use that document as the parent when creating the new child. Inform
+the user of the match and propose creating the document under it. On
+confirmation:
+
+```bash
+pm new <type> "<title>" --parent <parent-id>
+```
+
+Set the new document as current and continue.
+
+**No match found** — the work is not yet tracked at any level:
+
+- **Feature requested:** propose creating it directly.
+
+  ```bash
+  pm new feature "<title>"
+  ```
+
+- **Spec or task requested:** these require a parent. You cannot create a spec
+  without a feature, or a task without a spec.
+
+  1. List existing candidates as suggestions (e.g. active features for a spec,
+     active specs for a task): `pm list --type <parent-type>`.
+  2. Present sensible suggestions to the user and ask which to use as the
+     parent, or whether to create the required parent first.
+  3. Once a parent is confirmed — either selected or freshly created — create
+     the document with `pm new <type> "<title>" --parent <id>`.
+
+In all creation cases, set the new document as current with `pm current <id>`
+and continue.
