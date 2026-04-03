@@ -10,6 +10,8 @@ Skills are created and edited frequently in this project. When creating a new sk
 
 When writing `pm` command examples in skills, always use long option names (e.g. `--parent`, `--status`, `--type`) instead of short flags (`-p`, `-s`, `-t`). Agents parse long options more reliably.
 
+Changes to commands (arguments, options), new commands, and deprecated commands must always be reflected in `skills/pm-guide/SKILL.md`.
+
 ## Project structure
 
 ```
@@ -102,6 +104,13 @@ Documents are markdown files with YAML frontmatter. Filename format: `{ID}.{tag}
 - **Statuses** are free-form strings. Each doctype defines `doneStatuses` — statuses that mean "no more work needed."
 
 ## Testing
+
+All behavioural changes must be covered by tests. For bug fixes, follow this sequence:
+
+1. Add a test that verifies the correct behaviour (it will fail against the current code).
+2. Run the full test suite to confirm the new test fails.
+3. Implement the fix.
+4. Run the full test suite again to confirm all tests pass.
 
 We use [vitest](https://vitest.dev/). Every core and lib module should have a matching `.test.ts`.
 
