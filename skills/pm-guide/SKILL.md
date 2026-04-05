@@ -160,46 +160,40 @@ pm current 003                               # Set document 003 as current
 
 ## Typical workflow
 
-1. **Start a session**: run `pm status` so see the state of the project and the
-  current document for ongoing work.
-2. **Check the current document**: read it with `pm read <id>`, understand the
-   context.
+1. **Start a session**: run `pm current` to see the current document for ongoing
+   work, or `pm next` to see all actionable work as a tree.
+2. **Check the current document**: read it with `pm context <id>`, understand
+   the context.
 3. **Do the work**: implement, write, review — whatever the document describes.
 4. **Mark done or blocked**:
    - `pm done <id>` when the work is complete.
    - `pm blocked <id>` if work cannot proceed (waiting on dependencies, input,
      etc.).
-5. **Find next work**: run `pm next` to find the next workable document.
+5. **Find next work**: run `pm next` to see what's actionable.
 
 ### Finding next work
 
 ```bash
-pm next                    # Find the next workable document
-pm next --verbose          # Same, with verbose traversal log
+pm next                    # Show actionable documents as an indented tree
+pm next --with-blocked     # Include blocked documents alongside active ones
 ```
 
-`pm next` starts from the current document and traverses the hierarchy to find
-the next **leaf** document that is neither done nor blocked. It only returns
-leaf documents — documents with no children.
+`pm next` shows all actionable documents (not done, not blocked) as an indented
+tree, preserving the document hierarchy. Done or blocked documents that have
+actionable descendants appear as intermediaries with their actual status shown.
+The current document (if any) is marked with `[current]`.
 
-The command does not change the current document — it only reports the result.
-Use `pm current <id>` to switch to it.
+The command does not require a current document — it works in any project state.
+It does not change the current document. Use `pm current <id>` to switch to a
+document you want to work on.
 
-If the next document (feature, spec or task) is not really actionable, use your judgement to find work. You may replicate part of the next-finder algorithm:
-
-1. Look at siblings of the current document (same parent, sorted by ID). Pick
-   the first available one.
-2. If no sibling is available, move up to the parent and look at *its* siblings.
-3. Drill down into its children (first available child,
-   recursively) if there are children, recursively, until a leaf is reached.
-4. Do not select done or blocked documents.
-
-Use `pm show <id>` (to see children and parents) or `pm list --parent <id>` (to list
-direct children of a document), filtering out done and blocked documents.
+Use `pm show <id>` (to see children and parents) or `pm list --parent <id>` (to
+list direct children of a document) for more targeted queries.
 
 ## Tips for agents
 
-- Always start by running `pm status` to understand the project state.
+- Always start by running `pm next` to see all actionable work at a glance.
+  Use `pm status` for a full project report (counts per doctype).
 - To get the full context of a document, use `pm context <id>`. It prints the
   document's hierarchy (like `pm show`) followed by the raw file contents
   (including frontmatter) of every parent and the document itself, from topmost

@@ -5,8 +5,8 @@ import { parseFrontmatter } from "../lib/frontmatter.js"
 import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 import {
   type ChainEntry,
-  type Document,
   createDocument,
+  type Document,
   documentChain,
   editDocument,
   loadDocument,

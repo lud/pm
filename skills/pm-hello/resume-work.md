@@ -6,16 +6,16 @@ work was left off.
 ## Step 1 — Orient
 
 ```bash
-pm status
 pm current
 ```
 
-If there is **no current document**, list not-done features with
-`pm list --type feature` and ask the user which one to work on. Stop here until they
-choose.
+If there **is** a current document, read it with all its parent documents
+context with `pm context <id>` and proceed to Step 2.
 
-If there **is** a current document, read it with all its parent documents context with `pm
-context <id>` and proceed to Step 2.
+If there is **no current document**, run `pm next` to see all actionable work
+as a tree. If the tree makes the next step obvious (e.g. a single actionable
+leaf), propose it to the user and set it as current on confirmation. Otherwise
+ask the user which document to work on. Stop here until they choose.
 
 ## Step 2 — Evaluate the current document
 
@@ -65,19 +65,21 @@ branch below.
 ## Step 3 — Find next work
 
 When the current document is done, blocked, or otherwise not actionable, use
-`pm next` to find the next workable document. It traverses the hierarchy
-starting from the current document, looking for the nearest available leaf
-(siblings first, then up to parent siblings, drilling down into children).
+`pm next` to see all remaining actionable work as a tree.
 
 ```bash
 pm next
 ```
 
-If `pm next` finds a document, set it as current with `pm current <id>` and go
-back to Step 2 to evaluate it.
+Review the tree output. If an obvious next document stands out (e.g. a sibling
+task, or the next spec under the same feature), propose it to the user, set it
+as current with `pm current <id>`, and go back to Step 2.
 
-If `pm next` reports nothing left, congratulate the user — all work is done or
-blocked.
+If the tree shows multiple candidates and the choice isn't obvious, present the
+options and ask the user which to work on.
+
+If `pm next` reports no actionable documents, congratulate the user — all work
+is done or blocked.
 
 ## Marking documents as done or blocked
 

@@ -1,6 +1,6 @@
 import { cli } from "cleye"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { createTestProject, type TestSetup } from "../lib/test-setup.js"
+import { createTestProject, dedent, type TestSetup } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {
   const actual = (await vi.importActual("../lib/cli.js")) as Record<
@@ -52,26 +52,26 @@ const SETUP: TestSetup = {
     "context/features/001.feat.alpha/001.feat.alpha.md": {
       title: "Alpha",
       status: "new",
-    },
-    "context/features/001.feat.alpha/002.spec.design.md": {
-      parent: 1,
-      title: "Design",
-      status: "specified",
-    },
-    "context/features/001.feat.alpha/003.task.first.md": {
-      parent: 2,
-      title: "First",
-      status: "done",
-    },
-    "context/features/001.feat.alpha/004.task.second.md": {
-      parent: 2,
-      title: "Second",
-      status: "new",
-    },
-    "context/features/001.feat.alpha/005.task.third.md": {
-      parent: 2,
-      title: "Third",
-      status: "new",
+      children: {
+        "context/features/001.feat.alpha/002.spec.design.md": {
+          title: "Design",
+          status: "specified",
+          children: {
+            "context/features/001.feat.alpha/003.task.first.md": {
+              title: "First",
+              status: "done",
+            },
+            "context/features/001.feat.alpha/004.task.second.md": {
+              title: "Second",
+              status: "new",
+            },
+            "context/features/001.feat.alpha/005.task.third.md": {
+              title: "Third",
+              status: "new",
+            },
+          },
+        },
+      },
     },
   },
 }
@@ -89,41 +89,45 @@ describe("next command", () => {
     vi.clearAllMocks()
   })
 
-  it("shows the next document", () => {
+  it("shows tree with current marker", () => {
     const { dir, project } = testProject.setup(SETUP)
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    cli({ name: "pm", commands: [nextCommand] }, undefined, ["next"])
+
+    expect(infoOutput()).toBe(
+      dedent(`
+      feat 001 Alpha (new)
+        spec 002 Design (specified)
+          task 004 Second (new) [current]
+          task 005 Third (new)
+      `),
+    )
+  })
+
+  it("works without a current document", () => {
+    const { dir, project } = testProject.setup({
+      ...SETUP,
+      pmCurrent: undefined,
+    })
     vi.spyOn(process, "cwd").mockReturnValue(dir)
     vi.mocked(loadProjectFrom).mockReturnValue(project)
 
     cli({ name: "pm", commands: [nextCommand] }, undefined, ["next"])
 
     const output = infoOutput()
-    expect(output).toContain("005 task Third (new)")
-    expect(output).toContain("in context/features/")
+    expect(output).not.toContain("[current]")
+    expect(output).toContain("feat 001 Alpha (new)")
   })
 
-  it("shows no-next message when exhausted", () => {
+  it("shows message when all documents are done", () => {
     const { dir, project } = testProject.setup({
       pmJson: { doctypes: DOCTYPES },
-      pmCurrent: 4,
       files: {
         "context/features/001.feat.alpha/001.feat.alpha.md": {
           title: "Alpha",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/002.spec.design.md": {
-          parent: 1,
-          title: "Design",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/003.task.first.md": {
-          parent: 2,
-          title: "First",
           status: "done",
-        },
-        "context/features/001.feat.alpha/004.task.second.md": {
-          parent: 2,
-          title: "Second",
-          status: "new",
         },
       },
     })
@@ -132,35 +136,43 @@ describe("next command", () => {
 
     cli({ name: "pm", commands: [nextCommand] }, undefined, ["next"])
 
-    expect(infoOutput()).toContain("No next document found")
+    expect(infoOutput()).toBe("No actionable documents found.")
   })
 
-  it("aborts when no current document set", () => {
+  it("includes blocked documents with --with-blocked", () => {
     const { dir, project } = testProject.setup({
       pmJson: { doctypes: DOCTYPES },
       files: {
         "context/features/001.feat.alpha/001.feat.alpha.md": {
           title: "Alpha",
           status: "new",
+          children: {
+            "context/features/001.feat.alpha/002.spec.design.md": {
+              title: "Design",
+              status: "blocked",
+            },
+            "context/features/001.feat.alpha/003.spec.api.md": {
+              title: "API",
+              status: "new",
+            },
+          },
         },
       },
     })
     vi.spyOn(process, "cwd").mockReturnValue(dir)
     vi.mocked(loadProjectFrom).mockReturnValue(project)
 
-    expect(() =>
-      cli({ name: "pm", commands: [nextCommand] }, undefined, ["next"]),
-    ).toThrow("No current document set")
-  })
-
-  it("emits debug events in verbose mode", () => {
-    const { dir, project } = testProject.setup(SETUP)
-    vi.spyOn(process, "cwd").mockReturnValue(dir)
-    vi.mocked(loadProjectFrom).mockReturnValue(project)
-
     cli({ name: "pm", commands: [nextCommand] }, undefined, [
       "next",
-      "--verbose",
+      "--with-blocked",
     ])
+
+    expect(infoOutput()).toBe(
+      dedent(`
+      feat 001 Alpha (new)
+        spec 002 Design (blocked)
+        spec 003 API (new)
+      `),
+    )
   })
 })

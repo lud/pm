@@ -1,31 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { describe, expect, it } from "vitest"
 import { createTestProject, type TestSetup } from "../lib/test-setup.js"
-import {
-  findNextDocument,
-  type TraversalEvent,
-  TraversalEventTypes,
-} from "./next.js"
-
-let onEvent: (event: TraversalEvent) => void
-let expectEvent: (match: Partial<TraversalEvent>) => void
-
-beforeEach(() => {
-  const events: TraversalEvent[] = []
-  let callIndex = 0
-
-  onEvent = (e) => {
-    events.push(e)
-  }
-
-  expectEvent = (match) => {
-    expect(events[callIndex]).toMatchObject(match)
-    callIndex++
-  }
-
-  afterEach(() => {
-    expect(callIndex).toBe(events.length)
-  })
-})
+import { buildNextTree } from "./next.js"
 
 const testProject = createTestProject("next")
 
@@ -36,11 +11,11 @@ const DOCTYPES = {
 }
 
 // ---------------------------------------------------------------------------
-// Scenario A: sibling available
+// Scenario: full tree
 // feat 1 (new)
 //   spec 2 (specified) parent:1
 //     task 3 (done) parent:2
-//     task 4 (new) parent:2      ← current
+//     task 4 (new) parent:2
 //     task 5 (new) parent:2
 //   spec 6 (new) parent:1
 //     task 7 (new) parent:6
@@ -48,7 +23,7 @@ const DOCTYPES = {
 //   spec 9 (new) parent:8
 // ---------------------------------------------------------------------------
 
-const SCENARIO_FULL: TestSetup = {
+const FULL_SETUP: TestSetup = {
   pmJson: { doctypes: DOCTYPES },
   files: {
     "context/features/001.feat.alpha/001.feat.alpha.md": {
@@ -98,476 +73,112 @@ const SCENARIO_FULL: TestSetup = {
   },
 }
 
-describe("findNextDocument", () => {
-  it("scenario A: picks next sibling task", () => {
-    const { project } = testProject.setup(SCENARIO_FULL)
-    const result = findNextDocument(project, 4, { onEvent })
-    expect(result).not.toBeNull()
-    expect(result!.id).toBe(5)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 4 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 4 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 4,
-      siblingsIds: [3, 5],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 5 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 5 })
+function entryLine(e: {
+  document: { tag: string; id: number }
+  title: string
+  status?: string
+  depth: number
+  isCurrent: boolean
+}): string {
+  const indent = "  ".repeat(e.depth)
+  const statusStr = e.status ? ` (${e.status})` : ""
+  const currentMarker = e.isCurrent ? " [current]" : ""
+  return `${indent}${e.document.tag} ${e.document.id} ${e.title}${statusStr}${currentMarker}`
+}
+
+function treeText(entries: ReturnType<typeof buildNextTree>): string {
+  return entries.map(entryLine).join("\n")
+}
+
+describe("buildNextTree", () => {
+  it("builds tree with mixed statuses, pruning done leaves", () => {
+    const { project } = testProject.setup(FULL_SETUP)
+    const tree = buildNextTree(project, 4)
+
+    // task 3 is done — should not appear
+    expect(treeText(tree)).toBe(
+      [
+        "feat 1 Alpha (new)",
+        "  spec 2 Design (specified)",
+        "    task 4 Second (new) [current]",
+        "    task 5 Third (new)",
+        "  spec 6 API (new)",
+        "    task 7 Endpoint (new)",
+        "feat 8 Beta (new)",
+        "  spec 9 Beta design (new)",
+      ].join("\n"),
+    )
   })
 
-  it("scenario B: picks earlier sibling when current is last", () => {
-    const { project } = testProject.setup(SCENARIO_FULL)
-    const result = findNextDocument(project, 5, { onEvent })
-    expect(result).not.toBeNull()
-    expect(result!.id).toBe(4)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 5 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 5 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 5,
-      siblingsIds: [3, 4],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 4 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 4 })
-  })
-
-  it("scenario C: goes to parent sibling when no task sibling available", () => {
-    // Make task 5 done so 4 has no available siblings
-    const { project } = testProject.setup({
-      pmJson: { doctypes: DOCTYPES },
-      files: {
-        ...SCENARIO_FULL.files,
-        "context/features/001.feat.alpha/005.task.third.md": {
-          parent: 2,
-          title: "Third",
-          status: "done",
-        },
-      },
-    })
-    const result = findNextDocument(project, 4, { onEvent })
-    expect(result).not.toBeNull()
-    // Goes up to spec 2 → sibling spec 6 → child task 7
-    expect(result!.id).toBe(7)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 4 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 4 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 4,
-      siblingsIds: [3, 5],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 5 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 5,
-      parentId: 2,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 2,
-      siblingsIds: [6],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 6 })
-    expectEvent({
-      type: TraversalEventTypes.VisitChildren,
-      documentId: 6,
-      childrenIds: [7],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 7 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 7 })
-  })
-
-  it("scenario D: traverses across features to find leaf spec", () => {
-    // Tasks 5 and 7 done, so spec 6 has no available children
-    const { project } = testProject.setup({
-      pmJson: { doctypes: DOCTYPES },
-      files: {
-        ...SCENARIO_FULL.files,
-        "context/features/001.feat.alpha/005.task.third.md": {
-          parent: 2,
-          title: "Third",
-          status: "done",
-        },
-        "context/features/001.feat.alpha/007.task.endpoint.md": {
-          parent: 6,
-          title: "Endpoint",
-          status: "done",
-        },
-      },
-    })
-    const result = findNextDocument(project, 4, { onEvent })
-    expect(result).not.toBeNull()
-    // Goes up through specs, across to feat 8, down to spec 9 (leaf)
-    expect(result!.id).toBe(9)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 4 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 4 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 4,
-      siblingsIds: [3, 5],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 5 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 5,
-      parentId: 2,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 2,
-      siblingsIds: [6],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 6 })
-    expectEvent({
-      type: TraversalEventTypes.VisitChildren,
-      documentId: 6,
-      childrenIds: [7],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 7 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 7,
-      parentId: 6,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 6 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 6,
-      parentId: 1,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 1 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 1,
-      siblingsIds: [8],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 8 })
-    expectEvent({
-      type: TraversalEventTypes.VisitChildren,
-      documentId: 8,
-      childrenIds: [9],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 9 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 9 })
-  })
-
-  it("scenario E: traverses from deep task to distant leaf", () => {
-    // Everything in feat 1 tree is done except task 4 (current)
-    const { project } = testProject.setup({
-      pmJson: { doctypes: DOCTYPES },
-      files: {
-        ...SCENARIO_FULL.files,
-        "context/features/001.feat.alpha/005.task.third.md": {
-          parent: 2,
-          title: "Third",
-          status: "done",
-        },
-        "context/features/001.feat.alpha/006.spec.api.md": {
-          parent: 1,
-          title: "API",
-          status: "done",
-        },
-        "context/features/001.feat.alpha/007.task.endpoint.md": {
-          parent: 6,
-          title: "Endpoint",
-          status: "done",
-        },
-      },
-    })
-    const result = findNextDocument(project, 4, { onEvent })
-    expect(result).not.toBeNull()
-    expect(result!.id).toBe(9)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 4 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 4 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 4,
-      siblingsIds: [3, 5],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 5 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 5,
-      parentId: 2,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 2,
-      siblingsIds: [6],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 6 })
-    expectEvent({
-      type: TraversalEventTypes.VisitChildren,
-      documentId: 6,
-      childrenIds: [7],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 7 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 7,
-      parentId: 6,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 6 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 6,
-      parentId: 1,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 1 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 1,
-      siblingsIds: [8],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 8 })
-    expectEvent({
-      type: TraversalEventTypes.VisitChildren,
-      documentId: 8,
-      childrenIds: [9],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 9 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 9 })
-  })
-
-  it("scenario F: returns null when all documents unavailable", () => {
-    const { project } = testProject.setup({
-      pmJson: { doctypes: DOCTYPES },
-      files: {
-        ...SCENARIO_FULL.files,
-        "context/features/001.feat.alpha/004.task.second.md": {
-          parent: 2,
-          title: "Second",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/005.task.third.md": {
-          parent: 2,
-          title: "Third",
-          status: "done",
-        },
-        "context/features/001.feat.alpha/006.spec.api.md": {
-          parent: 1,
-          title: "API",
-          status: "done",
-        },
-        "context/features/001.feat.alpha/007.task.endpoint.md": {
-          parent: 6,
-          title: "Endpoint",
-          status: "done",
-        },
-        "context/features/008.feat.beta/008.feat.beta.md": {
-          title: "Beta",
-          status: "done",
-        },
-        "context/features/008.feat.beta/009.spec.beta-design.md": {
-          parent: 8,
-          title: "Beta design",
-          status: "done",
-        },
-      },
-    })
-    const result = findNextDocument(project, 4, { onEvent })
-    expect(result).toBeNull()
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 4 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 4 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 4,
-      siblingsIds: [3, 5],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 5 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 5,
-      parentId: 2,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 2,
-      siblingsIds: [6],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 6 })
-    expectEvent({
-      type: TraversalEventTypes.VisitChildren,
-      documentId: 6,
-      childrenIds: [7],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 7 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 7,
-      parentId: 6,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 6 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 6,
-      parentId: 1,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 1 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 1,
-      siblingsIds: [8],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 8 })
-    expectEvent({
-      type: TraversalEventTypes.VisitChildren,
-      documentId: 8,
-      childrenIds: [9],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 9 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 9,
-      parentId: 8,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 8 })
-    expectEvent({ type: TraversalEventTypes.Exhausted })
-  })
-
-  it("returns null when current document not found", () => {
-    const { project } = testProject.setup(SCENARIO_FULL)
-    const result = findNextDocument(project, 999, { onEvent })
-    expect(result).toBeNull()
-  })
-
-  it("skips blocked documents", () => {
-    const { project } = testProject.setup({
-      pmJson: { doctypes: DOCTYPES },
-      files: {
-        ...SCENARIO_FULL.files,
-        "context/features/001.feat.alpha/005.task.third.md": {
-          parent: 2,
-          title: "Third",
-          status: "blocked",
-        },
-      },
-    })
-    // Current=4, sibling 5 is blocked, sibling 3 is done → no task sibling
-    // Goes up to spec 2 → sibling spec 6 → child task 7
-    const result = findNextDocument(project, 4, { onEvent })
-    expect(result).not.toBeNull()
-    expect(result!.id).toBe(7)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 4 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 4 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 4,
-      siblingsIds: [3, 5],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 5 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 5,
-      parentId: 2,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 2,
-      siblingsIds: [6],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 6 })
-    expectEvent({
-      type: TraversalEventTypes.VisitChildren,
-      documentId: 6,
-      childrenIds: [7],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 7 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 7 })
-  })
-
-  it("selects leaf spec when it has no children", () => {
-    // Spec 9 has no tasks — it's a leaf, should be selectable
+  it("shows done intermediary when it has actionable descendants", () => {
     const { project } = testProject.setup({
       pmJson: { doctypes: DOCTYPES },
       files: {
         "context/features/001.feat.alpha/001.feat.alpha.md": {
           title: "Alpha",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/002.spec.one.md": {
-          parent: 1,
-          title: "One",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/003.spec.two.md": {
-          parent: 1,
-          title: "Two",
-          status: "new",
+          status: "done",
+          children: {
+            "context/features/001.feat.alpha/002.spec.design.md": {
+              title: "Design",
+              status: "done",
+              children: {
+                "context/features/001.feat.alpha/003.task.first.md": {
+                  title: "First",
+                  status: "done",
+                },
+                "context/features/001.feat.alpha/004.task.second.md": {
+                  title: "Second",
+                  status: "new",
+                },
+              },
+            },
+          },
         },
       },
     })
-    const result = findNextDocument(project, 2, { onEvent })
-    expect(result).not.toBeNull()
-    expect(result!.id).toBe(3)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 2 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 2,
-      siblingsIds: [3],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 3 })
+    const tree = buildNextTree(project, null)
+
+    // feat 1 and spec 2 are done but appear as intermediaries
+    // task 3 is done with no actionable descendants — pruned
+    expect(treeText(tree)).toBe(
+      [
+        "feat 1 Alpha (done)",
+        "  spec 2 Design (done)",
+        "    task 4 Second (new)",
+      ].join("\n"),
+    )
   })
 
-  it("handles single root feature with no children", () => {
+  it("works without a current document", () => {
+    const { project } = testProject.setup(FULL_SETUP)
+    const tree = buildNextTree(project, null)
+
+    // No [current] marker on any entry
+    expect(tree.every((e) => !e.isCurrent)).toBe(true)
+    expect(tree.length).toBeGreaterThan(0)
+  })
+
+  it("returns empty array when all documents are done", () => {
     const { project } = testProject.setup({
       pmJson: { doctypes: DOCTYPES },
       files: {
-        "context/features/001.feat.only/001.feat.only.md": {
-          title: "Only",
-          status: "new",
-        },
-        "context/features/002.feat.other/002.feat.other.md": {
-          title: "Other",
-          status: "new",
-        },
-      },
-    })
-    const result = findNextDocument(project, 1, { onEvent })
-    expect(result).not.toBeNull()
-    expect(result!.id).toBe(2)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 1 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 1 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 1,
-      siblingsIds: [2],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 2 })
-  })
-
-  it("returns null for single document project", () => {
-    const { project } = testProject.setup({
-      pmJson: { doctypes: DOCTYPES },
-      files: {
-        "context/features/001.feat.only/001.feat.only.md": {
-          title: "Only",
-          status: "new",
+        "context/features/001.feat.alpha/001.feat.alpha.md": {
+          title: "Alpha",
+          status: "done",
+          children: {
+            "context/features/001.feat.alpha/002.spec.design.md": {
+              title: "Design",
+              status: "done",
+            },
+          },
         },
       },
     })
-    const result = findNextDocument(project, 1, { onEvent })
-    expect(result).toBeNull()
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 1 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 1 })
-    expectEvent({ type: TraversalEventTypes.Exhausted })
+    const tree = buildNextTree(project, null)
+    expect(tree).toEqual([])
   })
 
-  it("skips doctypes with workflows disabled", () => {
+  it("excludes doctypes with workflows disabled", () => {
     const { project } = testProject.setup({
       pmJson: {
         doctypes: {
@@ -585,257 +196,173 @@ describe("findNextDocument", () => {
           title: "Alpha",
           status: "new",
         },
-        "context/features/001.feat.alpha/002.spec.design.md": {
-          parent: 1,
-          title: "Design",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/003.task.first.md": {
-          parent: 2,
-          title: "First",
-          status: "new",
-        },
         "context/features/010.ctx.notes.md": {
           title: "Notes",
           status: "new",
         },
       },
     })
-    // Current=3 (task), no sibling tasks → up to spec 2, no sibling specs
-    // → up to feat 1, context 10 exists but workflows=false so invisible
-    // → exhausted
-    const result = findNextDocument(project, 3, { onEvent })
-    expect(result).toBeNull()
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 3 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 3,
-      parentId: 2,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 2,
-      parentId: 1,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 1 })
-    expectEvent({ type: TraversalEventTypes.Exhausted })
+    const tree = buildNextTree(project, null)
+
+    const ids = tree.map((e) => e.document.id)
+    expect(ids).toContain(1)
+    expect(ids).not.toContain(10)
   })
 
-  it("traverses from current document even when its doctype has workflows disabled", () => {
+  it("excludes blocked documents by default", () => {
+    const { project } = testProject.setup({
+      pmJson: { doctypes: DOCTYPES },
+      files: {
+        "context/features/001.feat.alpha/001.feat.alpha.md": {
+          title: "Alpha",
+          status: "new",
+          children: {
+            "context/features/001.feat.alpha/002.spec.design.md": {
+              title: "Design",
+              status: "blocked",
+            },
+            "context/features/001.feat.alpha/003.spec.api.md": {
+              title: "API",
+              status: "new",
+            },
+          },
+        },
+      },
+    })
+    const tree = buildNextTree(project, null)
+
+    expect(treeText(tree)).toBe(
+      ["feat 1 Alpha (new)", "  spec 3 API (new)"].join("\n"),
+    )
+  })
+
+  it("includes blocked documents with withBlocked option", () => {
+    const { project } = testProject.setup({
+      pmJson: { doctypes: DOCTYPES },
+      files: {
+        "context/features/001.feat.alpha/001.feat.alpha.md": {
+          title: "Alpha",
+          status: "new",
+          children: {
+            "context/features/001.feat.alpha/002.spec.design.md": {
+              title: "Design",
+              status: "blocked",
+            },
+            "context/features/001.feat.alpha/003.spec.api.md": {
+              title: "API",
+              status: "new",
+            },
+          },
+        },
+      },
+    })
+    const tree = buildNextTree(project, null, { withBlocked: true })
+
+    expect(treeText(tree)).toBe(
+      [
+        "feat 1 Alpha (new)",
+        "  spec 2 Design (blocked)",
+        "  spec 3 API (new)",
+      ].join("\n"),
+    )
+  })
+
+  it("orders parents before children, siblings by ID", () => {
+    const { project } = testProject.setup(FULL_SETUP)
+    const tree = buildNextTree(project, null)
+
+    const ids = tree.map((e) => e.document.id)
+    // feat 1 before its children, feat 8 after feat 1's subtree
+    expect(ids.indexOf(1)).toBeLessThan(ids.indexOf(2))
+    expect(ids.indexOf(2)).toBeLessThan(ids.indexOf(4))
+    expect(ids.indexOf(4)).toBeLessThan(ids.indexOf(5))
+    expect(ids.indexOf(5)).toBeLessThan(ids.indexOf(6))
+    expect(ids.indexOf(6)).toBeLessThan(ids.indexOf(7))
+    expect(ids.indexOf(7)).toBeLessThan(ids.indexOf(8))
+    expect(ids.indexOf(8)).toBeLessThan(ids.indexOf(9))
+  })
+
+  it("shows deep intermediaries with custom done/blocked statuses across 4 levels", () => {
+    // A(epic) > B(story) > C(spec) > D(task)
+    // A is "closed" (done), B is "on-hold" (blocked), C is "shipped" (done), D is "todo" (active)
+    // D is actionable, so A, B, C all appear as intermediaries with their actual statuses
     const { project } = testProject.setup({
       pmJson: {
         doctypes: {
-          feature: {
-            tag: "feat",
-            dir: "context/features",
+          epic: {
+            tag: "epic",
+            dir: "epics",
             intermediateDir: true,
+            doneStatuses: ["closed"],
+            blockedStatuses: ["on-hold"],
           },
-          context: {
-            tag: "ctx",
-            dir: "context/meta",
-            intermediateDir: true,
-            workflows: false,
+          story: {
+            tag: "story",
+            dir: ".",
+            parent: "epic",
+            doneStatuses: ["closed"],
+            blockedStatuses: ["on-hold"],
+          },
+          spec: {
+            tag: "spec",
+            dir: ".",
+            parent: "story",
+            doneStatuses: ["shipped"],
+            blockedStatuses: ["waiting"],
+          },
+          task: {
+            tag: "task",
+            dir: ".",
+            parent: "spec",
+            doneStatuses: ["complete"],
+            blockedStatuses: ["stuck"],
           },
         },
       },
       files: {
-        "context/features/001.feat.alpha/001.feat.alpha.md": {
-          title: "Alpha",
-          status: "new",
-        },
-        "context/meta/002.ctx.notes.md": {
-          title: "Notes",
-          status: "new",
+        "epics/001.epic.platform/001.epic.platform.md": {
+          title: "Platform",
+          status: "closed",
+          children: {
+            "epics/001.epic.platform/002.story.auth.md": {
+              title: "Auth",
+              status: "on-hold",
+              children: {
+                "epics/001.epic.platform/003.spec.login.md": {
+                  title: "Login",
+                  status: "shipped",
+                  children: {
+                    "epics/001.epic.platform/004.task.implement.md": {
+                      title: "Implement",
+                      status: "todo",
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     })
-    // Current is a workflows-disabled doc but still used as starting point
-    const result = findNextDocument(project, 2, { onEvent })
-    expect(result).not.toBeNull()
-    expect(result!.id).toBe(1)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 2 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 2,
-      siblingsIds: [1],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 1 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 1 })
+    const tree = buildNextTree(project, null)
+
+    expect(treeText(tree)).toBe(
+      [
+        "epic 1 Platform (closed)",
+        "  story 2 Auth (on-hold)",
+        "    spec 3 Login (shipped)",
+        "      task 4 Implement (todo)",
+      ].join("\n"),
+    )
   })
 
-  it("does not return the current document even if active", () => {
-    // Only two tasks, current=4, sibling=3 is done. No other docs.
-    const { project } = testProject.setup({
-      pmJson: { doctypes: DOCTYPES },
-      files: {
-        "context/features/001.feat.alpha/001.feat.alpha.md": {
-          title: "Alpha",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/002.spec.design.md": {
-          parent: 1,
-          title: "Design",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/003.task.first.md": {
-          parent: 2,
-          title: "First",
-          status: "done",
-        },
-        "context/features/001.feat.alpha/004.task.second.md": {
-          parent: 2,
-          title: "Second",
-          status: "new",
-        },
-      },
-    })
-    // No available sibling, go up to spec 2 (has children but none available besides visited)
-    // spec 2 has no sibling, go up to feat 1 (no sibling) → exhausted
-    const result = findNextDocument(project, 4, { onEvent })
-    expect(result).toBeNull()
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 4 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 4 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 4,
-      siblingsIds: [3],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 3,
-      parentId: 2,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 2,
-      parentId: 1,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 1 })
-    expectEvent({ type: TraversalEventTypes.Exhausted })
-  })
+  it("handles multiple root documents at depth 0", () => {
+    const { project } = testProject.setup(FULL_SETUP)
+    const tree = buildNextTree(project, null)
 
-  // ---------------------------------------------------------------------------
-  // Children-of-current: when current is not a leaf, search its children first
-  // ---------------------------------------------------------------------------
-
-  it("searches children of current first when current is not a leaf", () => {
-    // Current=2 (spec, not a leaf), has child tasks 3 (done) and 4 (new)
-    // Should pick task 4 as the next document (child of current)
-    const { project } = testProject.setup({
-      pmJson: { doctypes: DOCTYPES },
-      files: {
-        "context/features/001.feat.alpha/001.feat.alpha.md": {
-          title: "Alpha",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/002.spec.design.md": {
-          parent: 1,
-          title: "Design",
-          status: "in-progress",
-        },
-        "context/features/001.feat.alpha/003.task.first.md": {
-          parent: 2,
-          title: "First",
-          status: "done",
-        },
-        "context/features/001.feat.alpha/004.task.second.md": {
-          parent: 2,
-          title: "Second",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/005.task.third.md": {
-          parent: 2,
-          title: "Third",
-          status: "new",
-        },
-      },
-    })
-    const result = findNextDocument(project, 2, { onEvent })
-    expect(result).not.toBeNull()
-    expect(result!.id).toBe(4)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 2 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.VisitChildren,
-      documentId: 2,
-      childrenIds: [3, 4, 5],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 3,
-      siblingsIds: [4, 5],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 4 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 4 })
-  })
-
-  it("falls back to siblings when current is not a leaf but all children are done", () => {
-    // Current=2 (spec), children 3 and 4 are both done
-    // Should fall back to sibling spec 5
-    const { project } = testProject.setup({
-      pmJson: { doctypes: DOCTYPES },
-      files: {
-        "context/features/001.feat.alpha/001.feat.alpha.md": {
-          title: "Alpha",
-          status: "new",
-        },
-        "context/features/001.feat.alpha/002.spec.design.md": {
-          parent: 1,
-          title: "Design",
-          status: "in-progress",
-        },
-        "context/features/001.feat.alpha/003.task.first.md": {
-          parent: 2,
-          title: "First",
-          status: "done",
-        },
-        "context/features/001.feat.alpha/004.task.second.md": {
-          parent: 2,
-          title: "Second",
-          status: "done",
-        },
-        "context/features/001.feat.alpha/005.spec.api.md": {
-          parent: 1,
-          title: "API",
-          status: "new",
-        },
-      },
-    })
-    const result = findNextDocument(project, 2, { onEvent })
-    expect(result).not.toBeNull()
-    expect(result!.id).toBe(5)
-    expectEvent({ type: TraversalEventTypes.Start, documentId: 2 })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.VisitChildren,
-      documentId: 2,
-      childrenIds: [3, 4],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 3 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 3,
-      siblingsIds: [4],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 4 })
-    expectEvent({
-      type: TraversalEventTypes.GoToParent,
-      documentId: 4,
-      parentId: 2,
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 2 })
-    expectEvent({
-      type: TraversalEventTypes.VisitSiblings,
-      documentId: 2,
-      siblingsIds: [5],
-    })
-    expectEvent({ type: TraversalEventTypes.Inspect, documentId: 5 })
-    expectEvent({ type: TraversalEventTypes.Found, documentId: 5 })
+    const roots = tree.filter((e) => e.depth === 0)
+    expect(roots).toHaveLength(2)
+    expect(roots[0].document.id).toBe(1)
+    expect(roots[1].document.id).toBe(8)
   })
 })

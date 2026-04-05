@@ -37,8 +37,7 @@ vi.mock("../lib/project.js", async () => {
 
 import * as cliMod from "../lib/cli.js"
 import { loadProjectFrom } from "../lib/project.js"
-import { contextCommand } from "./context.js"
-import { formatContentSeparator } from "./context.js"
+import { contextCommand, formatContentSeparator } from "./context.js"
 
 const testProject = createTestProject("context-cmd")
 

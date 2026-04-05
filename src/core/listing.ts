@@ -58,7 +58,7 @@ type ReaderResult = {
   parentId?: number | null
 }
 
-function classifyStatus(
+export function classifyStatus(
   status: string | undefined,
   doctype: ResolvedDoctype,
 ): "active" | "blocked" | "done" {
