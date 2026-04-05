@@ -2,7 +2,7 @@ import { appendFileSync } from "node:fs"
 import { join } from "node:path"
 import { cli } from "cleye"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createTestProject, dedent } from "../lib/test-setup.js"
+import { createTestProject } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {
   const actual = (await vi.importActual("../lib/cli.js")) as Record<
@@ -71,14 +71,6 @@ const BASIC_SETUP = {
 } as const
 
 function allOutput(): string {
-  const infoCalls = vi
-    .mocked(cliMod.info)
-    .mock.calls.map(([msg]) => msg)
-    .join("\n")
-  const writeCalls = vi
-    .mocked(cliMod.write)
-    .mock.calls.map(([msg]) => msg)
-    .join("")
   // Reconstruct output: info calls produce lines, write calls are inline
   // We interleave them in call order
   const calls: string[] = []
