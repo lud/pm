@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.1] - 2026-04-05
+
+### ⚙️ Miscellaneous Tasks
+
+- Fix tests unused variables
+
 ## [0.9.0] - 2026-04-05
 
 ### 🚀 Features
