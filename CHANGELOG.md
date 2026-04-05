@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-04-05
+
+### 🚀 Features
+
+- Support 'blocked by' in workflows
+- New pm-hello skill workflow
+- Simplified 'next' command to display a tree of active documents
+
+### 🚜 Refactor
+
+- Avoid double-file read on pm context
+
+### ⚙️ Miscellaneous Tasks
+
+- Claude rules
+
 ## [0.8.0] - 2026-04-01
 
 ### 🚀 Features
