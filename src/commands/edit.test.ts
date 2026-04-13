@@ -296,4 +296,56 @@ describe("edit command", () => {
       ]),
     ).toThrow("Blocking document 999 not found")
   })
+
+  it("renames file with --update-slug when title changes", () => {
+    const dir = setupMutableProject()
+
+    cli({ name: "pm", commands: [editCommand] }, undefined, [
+      "edit",
+      "2",
+      "--set",
+      "title:New login flow",
+      "--update-slug",
+    ])
+
+    const content = readFileSync(
+      join(
+        dir,
+        "context/features/001.feat.user-auth/002.spec.new-login-flow.md",
+      ),
+      "utf-8",
+    )
+    const { data } = parseFrontmatter(content)
+    expect(data.title).toBe("New login flow")
+    expect(cliMod.success).toHaveBeenCalledWith(
+      expect.stringContaining("Updated"),
+    )
+    expect(cliMod.info).toHaveBeenCalledWith(expect.stringContaining("Renamed"))
+  })
+
+  it("aborts on empty title via --set title:", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [editCommand] }, undefined, [
+        "edit",
+        "1",
+        "--set",
+        "title:",
+      ]),
+    ).toThrow("Title must not be empty")
+  })
+
+  it("aborts on blank title via --set title:   ", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [editCommand] }, undefined, [
+        "edit",
+        "1",
+        "--set",
+        "title:   ",
+      ]),
+    ).toThrow("Title must not be empty")
+  })
 })

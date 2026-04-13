@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { readdirSync, readFileSync, renameSync, rmdirSync } from "node:fs"
+import { basename, dirname, join } from "node:path"
 import {
   type FrontmatterData,
   parseFrontmatter,
@@ -180,6 +180,10 @@ export function createDocument(
     throw new Error(`Unknown doctype: "${doctypeName}"`)
   }
 
+  if (title.trim().length === 0) {
+    throw new Error("Title must not be empty")
+  }
+
   // Validate parent requirements
   let parentDoc: DocumentInfo | null = null
   if (doctype.parent !== undefined) {
@@ -259,17 +263,31 @@ export function createDocument(
 // Edit a document's frontmatter
 // ---------------------------------------------------------------------------
 
+export type EditResult = {
+  document: DocumentInfo
+  renamed?: { from: string; to: string }
+}
+
 export function editDocument(
   project: ResolvedProject,
   id: number,
   options: {
     setParent?: number
     setProperties?: Record<string, unknown>
+    updateSlug?: boolean
   },
-): DocumentInfo {
+): EditResult {
   const doc = readDocument(project, id)
   if (!doc) {
     throw new Error(`Document ${id} not found`)
+  }
+
+  // Validate title is not empty/blank
+  if (options.setProperties?.title !== undefined) {
+    const title = String(options.setProperties.title).trim()
+    if (title.length === 0) {
+      throw new Error("Title must not be empty")
+    }
   }
 
   const updates: Record<string, unknown> = {}
@@ -303,17 +321,39 @@ export function editDocument(
     Object.assign(updates, options.setProperties)
   }
 
-  if (Object.keys(updates).length === 0) {
-    return doc
+  if (Object.keys(updates).length === 0 && !options.updateSlug) {
+    return { document: doc }
   }
 
   // Apply updates
-  const content = readFileSync(doc.path, "utf-8")
-  const newContent = setFrontmatterProperties(content, updates)
-  writeFileSyncOrAbort(doc.path, newContent)
+  if (Object.keys(updates).length > 0) {
+    const content = readFileSync(doc.path, "utf-8")
+    const newContent = setFrontmatterProperties(content, updates)
+    writeFileSyncOrAbort(doc.path, newContent)
+  }
 
-  // Return updated document
-  return readDocument(project, id)!
+  // Handle slug update (rename file based on title)
+  let renamed: { from: string; to: string } | undefined
+  if (options.updateSlug) {
+    const updatedDoc = readDocument(project, id)!
+    const title = updatedDoc.frontmatter.title
+    if (typeof title === "string" && title.trim().length > 0) {
+      const baseDir = resolveBaseDir(project, updatedDoc)
+      const expectedPath = computeExpectedPath(
+        project,
+        updatedDoc.id,
+        updatedDoc.tag,
+        title,
+        updatedDoc.doctype,
+        baseDir,
+      )
+      renamed = renameDocument(updatedDoc, expectedPath)
+    }
+  }
+
+  // Return updated document (re-scan to pick up new path)
+  const result = readDocument(project, id)!
+  return { document: result, renamed }
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +378,7 @@ export function markDone(project: ResolvedProject, id: number): MarkDoneResult {
     )
   }
 
-  const document = editDocument(project, id, {
+  const { document } = editDocument(project, id, {
     setProperties: { status: doneStatus },
   })
 
@@ -399,18 +439,93 @@ export function markBlocked(
     )
   }
 
-  return editDocument(project, id, { setProperties })
+  return editDocument(project, id, { setProperties }).document
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function slugify(title: string): string {
+export function slugify(title: string): string {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
+}
+
+/**
+ * Compute the expected path for a document based on its title.
+ * baseDir is the parent's "self directory" (dirname of parent's path),
+ * or the project root if the document has no parent.
+ */
+export function computeExpectedPath(
+  project: ResolvedProject,
+  id: number,
+  tag: string,
+  title: string,
+  doctype: ResolvedDoctype,
+  baseDir: string,
+): string {
+  const slug = slugify(title)
+  const filename = formatDocumentFilename(id, tag, slug, project.idPadWidth)
+  const targetDir = doctype.dir === "." ? baseDir : join(baseDir, doctype.dir)
+
+  if (doctype.intermediateDir) {
+    const dirName = filename.replace(/\.md$/, "")
+    return join(targetDir, dirName, filename)
+  }
+  return join(targetDir, filename)
+}
+
+/**
+ * Rename a document file to its expected path.
+ * For intermediateDir documents, renames the containing directory
+ * (which moves children along), then renames the file inside.
+ * Returns the rename operation, or undefined if no rename was needed.
+ */
+export function renameDocument(
+  doc: { path: string; doctype: ResolvedDoctype },
+  expectedPath: string,
+): { from: string; to: string } | undefined {
+  if (doc.path === expectedPath) return undefined
+
+  if (doc.doctype.intermediateDir) {
+    const currentDir = dirname(doc.path)
+    const expectedDir = dirname(expectedPath)
+    mkdirSyncOrAbort(dirname(expectedDir), { recursive: true })
+    renameSync(currentDir, expectedDir)
+    // The file is now inside the renamed directory — rename it too
+    const fileInNewDir = join(expectedDir, basename(doc.path))
+    if (fileInNewDir !== expectedPath) {
+      renameSync(fileInNewDir, expectedPath)
+    }
+  } else {
+    mkdirSyncOrAbort(dirname(expectedPath), { recursive: true })
+    renameSync(doc.path, expectedPath)
+  }
+
+  tryRemoveEmptyDir(dirname(doc.path))
+  return { from: doc.path, to: expectedPath }
+}
+
+/**
+ * Resolve the base directory for computing a document's expected path.
+ */
+function resolveBaseDir(project: ResolvedProject, doc: DocumentInfo): string {
+  const parentId = parseFrontmatterId(doc.frontmatter.parent)
+  if (doc.doctype.parent === undefined || parentId === null) {
+    return project.projectDir
+  }
+  const parentDoc = findDocumentById(project, parentId)
+  return parentDoc ? dirname(parentDoc.path) : dirname(doc.path)
+}
+
+function tryRemoveEmptyDir(dir: string): void {
+  try {
+    if (readdirSync(dir).length === 0) rmdirSync(dir)
+  } catch {
+    // Directory doesn't exist or can't be read — fine
+  }
 }
 
 /**

@@ -5,6 +5,7 @@ import { parseFrontmatter } from "../lib/frontmatter.js"
 import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 import {
   type ChainEntry,
+  computeExpectedPath,
   createDocument,
   type Document,
   documentChain,
@@ -14,6 +15,7 @@ import {
   markDone,
   readDocument,
   showDocument,
+  slugify,
 } from "./documents.js"
 import { findDocumentById } from "./scanner.js"
 
@@ -355,6 +357,20 @@ describe("createDocument", () => {
     ).toThrow(/does not accept a parent/)
   })
 
+  it("throws when title is empty", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    expect(() => createDocument(project, "feature", "")).toThrow(
+      /Title must not be empty/,
+    )
+  })
+
+  it("throws when title is blank", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    expect(() => createDocument(project, "feature", "   ")).toThrow(
+      /Title must not be empty/,
+    )
+  })
+
   it("uses custom status when provided", () => {
     const { project } = testProject.setup(BASIC_SETUP)
     const result = createDocument(project, "feature", "Custom", {
@@ -417,7 +433,7 @@ describe("createDocument", () => {
 describe("editDocument", () => {
   it("updates a property", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const doc = editDocument(project, 1, {
+    const { document: doc } = editDocument(project, 1, {
       setProperties: { status: "in-progress" },
     })
     expect(doc.frontmatter.status).toBe("in-progress")
@@ -425,7 +441,7 @@ describe("editDocument", () => {
 
   it("updates multiple properties", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const doc = editDocument(project, 1, {
+    const { document: doc } = editDocument(project, 1, {
       setProperties: { status: "done", priority: "high" },
     })
     expect(doc.frontmatter.status).toBe("done")
@@ -434,7 +450,7 @@ describe("editDocument", () => {
 
   it("preserves typed values when updating properties", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const doc = editDocument(project, 1, {
+    const { document: doc } = editDocument(project, 1, {
       setProperties: { retries: -2, ratio: 3.14, blocked: true },
     })
 
@@ -445,7 +461,7 @@ describe("editDocument", () => {
 
   it("sets parent as ref string", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const doc = editDocument(project, 4, { setParent: 2 })
+    const { document: doc } = editDocument(project, 4, { setParent: 2 })
     expect(doc.frontmatter.parent).toBe("2.spec.login-flow")
   })
 
@@ -466,8 +482,83 @@ describe("editDocument", () => {
 
   it("returns unchanged document when no updates", () => {
     const { project } = testProject.setup(BASIC_SETUP)
-    const doc = editDocument(project, 1, {})
+    const { document: doc } = editDocument(project, 1, {})
     expect(doc.frontmatter.title).toBe("User authentication")
+  })
+
+  it("throws when title is empty string", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    expect(() =>
+      editDocument(project, 1, { setProperties: { title: "" } }),
+    ).toThrow(/Title must not be empty/)
+  })
+
+  it("throws when title is blank string", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    expect(() =>
+      editDocument(project, 1, { setProperties: { title: "   " } }),
+    ).toThrow(/Title must not be empty/)
+  })
+
+  it("renames file when updateSlug is true and title changed", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    const { document: doc, renamed } = editDocument(project, 2, {
+      setProperties: { title: "New login flow" },
+      updateSlug: true,
+    })
+
+    expect(renamed).toBeDefined()
+    expect(renamed!.from).toContain("002.spec.login-flow.md")
+    expect(renamed!.to).toContain("002.spec.new-login-flow.md")
+    expect(doc.path).toContain("002.spec.new-login-flow.md")
+    expect(doc.frontmatter.title).toBe("New login flow")
+  })
+
+  it("does not rename when updateSlug is false", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    const { document: doc, renamed } = editDocument(project, 2, {
+      setProperties: { title: "New login flow" },
+    })
+
+    expect(renamed).toBeUndefined()
+    expect(doc.path).toContain("002.spec.login-flow.md")
+  })
+
+  it("renames intermediateDir document and its directory", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    const { document: doc, renamed } = editDocument(project, 1, {
+      setProperties: { title: "Account system" },
+      updateSlug: true,
+    })
+
+    expect(renamed).toBeDefined()
+    expect(renamed!.from).toContain("001.feat.user-auth/001.feat.user-auth.md")
+    expect(renamed!.to).toContain(
+      "001.feat.account-system/001.feat.account-system.md",
+    )
+    expect(doc.path).toContain("001.feat.account-system.md")
+  })
+
+  it("children are found after intermediateDir rename", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    editDocument(project, 1, {
+      setProperties: { title: "Account system" },
+      updateSlug: true,
+    })
+
+    // Children should still be findable (they moved with the directory)
+    const spec = readDocument(project, 2)
+    expect(spec).not.toBeNull()
+    expect(spec!.path).toContain("001.feat.account-system/")
+  })
+
+  it("does not rename when slug already matches title", () => {
+    const { project } = testProject.setup(BASIC_SETUP)
+    const { renamed } = editDocument(project, 2, {
+      updateSlug: true,
+    })
+
+    expect(renamed).toBeUndefined()
   })
 })
 

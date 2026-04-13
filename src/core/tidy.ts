@@ -7,7 +7,11 @@ import {
   writeFileSyncOrAbort,
 } from "../lib/fs-helpers.js"
 import type { ResolvedProject } from "../lib/project.js"
-import type { Document } from "./documents.js"
+import {
+  computeExpectedPath,
+  type Document,
+  renameDocument,
+} from "./documents.js"
 import {
   formatParentRef,
   parseFrontmatterId,
@@ -161,12 +165,6 @@ function computeAllExpectedPaths(
 
     const doctype = doc.doctype
     const newId = idRemapping.get(doc.path) ?? doc.id
-    const filename = formatDocumentFilename(
-      newId,
-      doc.tag,
-      doc.slug,
-      project.idPadWidth,
-    )
 
     // Determine base directory
     let baseDir: string
@@ -185,14 +183,34 @@ function computeAllExpectedPaths(
       }
     }
 
-    // Append doctype's dir
-    const targetDir = doctype.dir === "." ? baseDir : join(baseDir, doctype.dir)
+    // Use title-based slug if available, otherwise keep current slug
+    const title =
+      typeof doc.frontmatter.title === "string" &&
+      doc.frontmatter.title.trim().length > 0
+        ? doc.frontmatter.title
+        : null
 
-    if (doctype.intermediateDir) {
-      const dirName = filename.replace(/\.md$/, "")
-      result.set(doc.path, join(targetDir, dirName, filename))
+    if (title) {
+      result.set(
+        doc.path,
+        computeExpectedPath(project, newId, doc.tag, title, doctype, baseDir),
+      )
     } else {
-      result.set(doc.path, join(targetDir, filename))
+      // No title — fall back to current slug
+      const filename = formatDocumentFilename(
+        newId,
+        doc.tag,
+        doc.slug,
+        project.idPadWidth,
+      )
+      const targetDir =
+        doctype.dir === "." ? baseDir : join(baseDir, doctype.dir)
+      if (doctype.intermediateDir) {
+        const dirName = filename.replace(/\.md$/, "")
+        result.set(doc.path, join(targetDir, dirName, filename))
+      } else {
+        result.set(doc.path, join(targetDir, filename))
+      }
     }
   }
 
@@ -442,34 +460,21 @@ export function resolveOrphan(
   const newContent = prependFrontmatter(data, bodyWithoutFM())
   writeFileSyncOrAbort(orphan.path, newContent)
 
-  // 2. Compute expected path
+  // 2. Compute expected path and relocate
   const parentSelfDir = dirname(parent.path)
-  const doctype = orphan.doctype
-  const targetDir =
-    doctype.dir === "." ? parentSelfDir : join(parentSelfDir, doctype.dir)
-  const filename = formatDocumentFilename(
+  const title = orphan.frontmatter.title
+  const slug =
+    typeof title === "string" && title.trim().length > 0 ? title : orphan.slug
+  const expectedPath = computeExpectedPath(
+    project,
     orphan.id,
     orphan.tag,
-    orphan.slug,
-    project.idPadWidth,
+    slug,
+    orphan.doctype,
+    parentSelfDir,
   )
 
-  let expectedPath: string
-  if (doctype.intermediateDir) {
-    const dirName = filename.replace(/\.md$/, "")
-    expectedPath = join(targetDir, dirName, filename)
-  } else {
-    expectedPath = join(targetDir, filename)
-  }
-
-  // 3. Relocate if path differs
-  if (expectedPath !== orphan.path) {
-    mkdirSyncOrAbort(dirname(expectedPath), { recursive: true })
-    renameSyncOrAbort(orphan.path, expectedPath)
-
-    // Clean up empty source directory
-    tryRemoveEmptyDir(dirname(orphan.path))
-  }
+  renameDocument(orphan, expectedPath)
 }
 
 function tryRemoveEmptyDir(dir: string): void {

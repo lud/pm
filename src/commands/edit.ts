@@ -31,6 +31,11 @@ export const editCommand = command(
         type: [String],
         description: "Set frontmatter property: key:value",
       },
+      "update-slug": {
+        type: Boolean,
+        description: "Rewrite filename slug to match the current title",
+        default: false,
+      },
     },
   },
   (argv) => {
@@ -112,15 +117,21 @@ export const editCommand = command(
     }
 
     try {
-      const doc = editDocument(project, id, {
+      const { document: doc, renamed } = editDocument(project, id, {
         setParent,
         setProperties:
           Object.keys(properties).length > 0 ? properties : undefined,
+        updateSlug: argv.flags["update-slug"],
       })
 
       touchCurrent(project.projectDir)
       const displayPath = formatPath(doc.path, process.cwd())
       cli.success(`Updated ${displayPath}`)
+      if (renamed) {
+        cli.info(
+          `Renamed ${formatPath(renamed.from, process.cwd())} → ${formatPath(renamed.to, process.cwd())}`,
+        )
+      }
     } catch (err) {
       cli.abortError((err as Error).message)
     }

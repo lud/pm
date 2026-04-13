@@ -33,7 +33,7 @@ const BASIC_SETUP = {
   },
   files: {
     "context/features/001.feat.user-auth/001.feat.user-auth.md": {
-      title: "User authentication",
+      title: "User auth",
       status: "new",
     },
     "context/features/001.feat.user-auth/002.spec.login-flow.md": {
@@ -43,7 +43,7 @@ const BASIC_SETUP = {
     },
     "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
       parent: "2.spec.login-flow",
-      title: "Add JWT middleware",
+      title: "Jwt middleware",
       status: "done",
     },
     "context/features/001.feat.user-auth/004.task.session-store.md": {
@@ -60,22 +60,22 @@ const DUPE_SETUP = {
   },
   files: {
     "context/features/001.feat.auth/001.feat.auth.md": {
-      title: "Auth feature",
+      title: "Auth",
       status: "new",
     },
     "context/features/001.feat.auth/002.spec.login.md": {
       parent: "1.feat.auth",
-      title: "Login spec",
+      title: "Login",
       status: "new",
     },
     "context/features/001.feat.auth/002.spec.signup.md": {
       parent: "1.feat.auth",
-      title: "Signup spec",
+      title: "Signup",
       status: "new",
     },
     "context/features/001.feat.auth/003.task.form.md": {
       parent: "2.spec.login",
-      title: "Build login form",
+      title: "Form",
       status: "new",
     },
   },
@@ -258,11 +258,11 @@ describe("buildTidyPlan with orphans", () => {
       pmJson: { doctypes: BASIC_DOCTYPES },
       files: {
         "context/features/001.feat.test/001.feat.test.md": {
-          title: "Test feature",
+          title: "Test",
           status: "new",
         },
         "context/features/001.feat.test/002.spec.no-parent.md": {
-          title: "Spec without parent",
+          title: "No parent",
           status: "new",
         },
       },
@@ -278,11 +278,11 @@ describe("buildTidyPlan with orphans", () => {
       pmJson: { doctypes: BASIC_DOCTYPES },
       files: {
         "context/features/001.feat.test/001.feat.test.md": {
-          title: "Test feature",
+          title: "Test",
           status: "new",
         },
         "context/features/001.feat.test/002.spec.no-parent.md": {
-          title: "Spec without parent",
+          title: "No parent",
           status: "new",
         },
       },
@@ -301,12 +301,12 @@ describe("buildTidyPlan with orphans", () => {
       pmJson: { doctypes: BASIC_DOCTYPES },
       files: {
         "context/features/001.feat.test/001.feat.test.md": {
-          title: "Test feature",
+          title: "Test",
           status: "new",
         },
         "context/features/001.feat.test/002.spec.orphan.md": {
           parent: "999.feat.nonexistent",
-          title: "Orphan spec",
+          title: "Orphan",
           status: "new",
         },
       },
@@ -328,12 +328,12 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
       pmJson: { doctypes: BASIC_DOCTYPES },
       files: {
         "context/features/001.feat.test/001.feat.test.md": {
-          title: "Test feature",
+          title: "Test",
           status: "new",
         },
         "context/features/001.feat.test/002.spec.login.md": {
           parent: 1,
-          title: "Login spec",
+          title: "Login",
           status: "new",
         },
       },
@@ -350,12 +350,12 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
       pmJson: { doctypes: BASIC_DOCTYPES },
       files: {
         "context/features/001.feat.test/001.feat.test.md": {
-          title: "Test feature",
+          title: "Test",
           status: "new",
         },
         "context/features/001.feat.test/002.spec.login.md": {
           parent: "1.feat.test",
-          title: "Login spec",
+          title: "Login",
           status: "new",
         },
       },
@@ -371,12 +371,12 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
       pmJson: { doctypes: BASIC_DOCTYPES },
       files: {
         "context/features/001.feat.test/001.feat.test.md": {
-          title: "Test feature",
+          title: "Test",
           status: "new",
         },
         "context/features/001.feat.test/002.spec.login.md": {
           parent: 1,
-          title: "Login spec",
+          title: "Login",
           status: "new",
         },
       },
@@ -423,7 +423,7 @@ describe("buildTidyPlan with ambiguous duplicate parent", () => {
         },
         "context/features/001.feat.test/003.task.child.md": {
           parent: "2.spec.gamma",
-          title: "Child task",
+          title: "Child",
           status: "new",
         },
       },
@@ -482,7 +482,7 @@ describe("applyTidyPlan", () => {
 
     const content = readFileSync(signup!.path, "utf-8")
     const { data } = parseFrontmatter(content)
-    expect(data.title).toBe("Signup spec")
+    expect(data.title).toBe("Signup")
   })
 
   it("updates parent refs when parent ID changes", async () => {
@@ -503,9 +503,9 @@ describe("applyTidyPlan", () => {
           title: "Beta",
           status: "new",
         },
-        "context/features/001.feat.test/003.task.child.md": {
+        "context/features/001.feat.test/003.task.child-task.md": {
           parent: "2.spec.beta",
-          title: "Child",
+          title: "Child task",
           status: "new",
         },
       },
@@ -527,7 +527,7 @@ describe("applyTidyPlan", () => {
 
     const newProject = reloadProject(dir)
     const newDocs = [...scanDocuments(newProject)]
-    const child = newDocs.find((d) => d.slug === "child")
+    const child = newDocs.find((d) => d.slug === "child-task")
     expect(child).toBeDefined()
     const childContent = readFileSync(child!.path, "utf-8")
     const { data } = parseFrontmatter(childContent)
@@ -545,5 +545,123 @@ describe("applyTidyPlan", () => {
     expect(plan2.edits).toHaveLength(0)
     expect(plan2.moves).toHaveLength(0)
     expect(plan2.orphans).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Slug renaming based on title
+// ---------------------------------------------------------------------------
+
+describe("buildTidyPlan slug renaming", () => {
+  it("renames file when slug does not match title", async () => {
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.old-name/001.feat.old-name.md": {
+          title: "New name",
+          status: "new",
+        },
+      },
+    })
+
+    const plan = await buildTidyPlan(project)
+
+    const featMove = plan.moves.find((m) =>
+      m.from.includes("001.feat.old-name"),
+    )
+    expect(featMove).toBeDefined()
+    expect(featMove!.to).toContain("001.feat.new-name/001.feat.new-name.md")
+  })
+
+  it("does not rename when slug already matches title", async () => {
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.my-feature/001.feat.my-feature.md": {
+          title: "My feature",
+          status: "new",
+        },
+      },
+    })
+
+    const plan = await buildTidyPlan(project)
+    expect(plan.moves).toHaveLength(0)
+  })
+
+  it("renames non-intermediateDir file when slug mismatches title", async () => {
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.auth/001.feat.auth.md": {
+          title: "Auth",
+          status: "new",
+        },
+        "context/features/001.feat.auth/002.spec.old-spec-name.md": {
+          parent: "1.feat.auth",
+          title: "New spec name",
+          status: "new",
+        },
+      },
+    })
+
+    const plan = await buildTidyPlan(project)
+
+    const specMove = plan.moves.find((m) =>
+      m.from.includes("002.spec.old-spec-name"),
+    )
+    expect(specMove).toBeDefined()
+    expect(specMove!.to).toContain("002.spec.new-spec-name.md")
+  })
+
+  it("applies slug rename end-to-end", async () => {
+    const { dir } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.old-name/001.feat.old-name.md": {
+          title: "New name",
+          status: "new",
+        },
+        "context/features/001.feat.old-name/002.spec.child.md": {
+          parent: "1.feat.old-name",
+          title: "Child",
+          status: "new",
+        },
+      },
+    })
+
+    const project = reloadProject(dir)
+    const plan = await buildTidyPlan(project)
+    applyTidyPlan(plan)
+
+    // Re-scan
+    const newProject = reloadProject(dir)
+    const docs = [...scanDocuments(newProject)]
+    const feat = docs.find((d) => d.id === 1)
+    expect(feat).toBeDefined()
+    expect(feat!.slug).toBe("new-name")
+    expect(feat!.path).toContain("001.feat.new-name/001.feat.new-name.md")
+
+    // Child should be inside renamed directory
+    const spec = docs.find((d) => d.id === 2)
+    expect(spec).toBeDefined()
+    expect(spec!.path).toContain("001.feat.new-name/")
+
+    // Should be idempotent
+    const plan2 = await buildTidyPlan(newProject)
+    expect(plan2.moves).toHaveLength(0)
+  })
+
+  it("falls back to current slug when title is missing", async () => {
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.no-title/001.feat.no-title.md": {
+          status: "new",
+        },
+      },
+    })
+
+    const plan = await buildTidyPlan(project)
+    expect(plan.moves).toHaveLength(0)
   })
 })
