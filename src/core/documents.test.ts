@@ -5,7 +5,6 @@ import { parseFrontmatter } from "../lib/frontmatter.js"
 import { createTestProject, type TestSetup } from "../lib/test-setup.js"
 import {
   type ChainEntry,
-  computeExpectedPath,
   createDocument,
   type Document,
   documentChain,
@@ -15,7 +14,6 @@ import {
   markDone,
   readDocument,
   showDocument,
-  slugify,
 } from "./documents.js"
 import { findDocumentById } from "./scanner.js"
 
