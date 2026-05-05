@@ -163,7 +163,8 @@ pm current 003                               # Set document 003 as current
 1. **Start a session**: run `pm current` to see the current document for ongoing
    work, or `pm next` to see all actionable work as a tree.
 2. **Check the current document**: read it with `pm context <id>`, understand
-   the context.
+   the context. Using `pm context` repeatedly on children repeats all parents
+   documents. Prefer `pm read <id>` to read multiple documents in parallel.
 3. **Do the work**: implement, write, review — whatever the document describes.
 4. **Mark done or blocked**:
    - `pm done <id>` when the work is complete.
