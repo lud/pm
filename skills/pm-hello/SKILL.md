@@ -13,8 +13,11 @@ user-invocable: true
 
 # PM Hello — Session Bootstrap
 
-**Always start:** load the `pm-guide` skill for command reference and concept
+**Always** load the `pm-guide` skill for command reference and concept
 definitions used throughout this workflow.
+
+**Always** run the `pm info` command to know about the current managed document
+types.
 
 Then choose a mode based on how the skill was invoked.
 
