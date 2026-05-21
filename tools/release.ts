@@ -1,15 +1,5 @@
 #!/usr/bin/env npx tsx
 
-/**
- * Release script: bump version, generate changelog, commit and tag.
- *
- * Usage:
- *   npx tsx tools/release.ts patch    # 0.1.0 → 0.1.1
- *   npx tsx tools/release.ts minor    # 0.1.0 → 0.2.0
- *   npx tsx tools/release.ts major    # 0.1.0 → 1.0.0
- *   npx tsx tools/release.ts 1.2.3    # explicit version
- */
-
 import { execSync } from "node:child_process"
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"

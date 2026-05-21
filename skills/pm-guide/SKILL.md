@@ -134,6 +134,8 @@ pm which 1 2 3             # Print paths for multiple documents
 
 ### Creating documents
 
+The `pm new` command creates a new document and outputs the created file.
+
 ```bash
 pm new feature User authentication           # Create a feature (title: "User authentication")
 pm new spec Login flow --parent 001           # Create a spec under feature 001
@@ -145,6 +147,8 @@ pm new spec API design --parent 001 --editor  # Create and open in $EDITOR
 
 Title words are joined automatically — no quotes needed. The slug is derived
 from the title (lowercased, spaces become hyphens).
+
+The file will contain a frontmatter, it must be read before editing it.
 
 ### Updating documents
 
