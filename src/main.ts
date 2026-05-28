@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { cli } from "cleye"
 import { blockedCommand } from "./commands/blocked.js"
 import { contextCommand } from "./commands/context.js"
@@ -17,9 +18,13 @@ import { tidyCommand } from "./commands/tidy.js"
 import { whichCommand } from "./commands/which.js"
 import { abortError } from "./lib/cli.js"
 
+const packageJson = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+) as { version: string }
+
 const argv = cli({
   name: "pm",
-  version: "0.1.0",
+  version: packageJson.version,
   commands: [
     newCommand,
     listCommand,
