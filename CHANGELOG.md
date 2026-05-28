@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2026-05-28
+
+### 📚 Documentation
+
+- Prefer pm read over context for parallel calls
+- Skill tweaks
+- Prevent pm which calls from Claude after pm new
+- Prevent useless task creation in pm-guide skill
+
 ## [0.10.1] - 2026-04-13
 
 ### ⚙️ Miscellaneous Tasks
