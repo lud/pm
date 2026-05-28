@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.1] - 2026-05-28
+
+### 🐛 Bug Fixes
+
+- Fixed version display on releases
+
 ## [0.11.0] - 2026-05-28
 
 ### 📚 Documentation
