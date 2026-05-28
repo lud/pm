@@ -195,6 +195,53 @@ document you want to work on.
 Use `pm show <id>` (to see children and parents) or `pm list --parent <id>` (to
 list direct children of a document) for more targeted queries.
 
+## Scoping specs and tasks
+
+By default, the user decides the size of specs and tasks. PM does not have a
+configuration setting or file that defines how large a spec should be. Some
+projects may add their own instructions for this, but unless instructed
+otherwise, use the defaults below.
+
+**A spec is usually one self-contained change** that can land safely. It should
+contain enough technical detail that implementation is straightforward: the main
+code paths involved, the expected shape of the change, and how to verify it.
+
+**Create a task when:**
+
+- A specific part of a spec needs its own technical detail or design notes that
+  would clutter the spec.
+- The work describes a long or multi-step process worth tracking separately.
+- You're handing off after an exploratory session and want to capture findings
+  or next steps for a later session.
+- The user explicitly wants part of the spec broken out into a separate task,
+  or one part needs fine-grained implementation notes that would clutter the
+  spec.
+- Unrelated work surfaces that needs doing — a broken build, a CVE in a
+  dependency, a cleanup the spec depends on. File it as a task under the current
+  spec rather than derailing the spec itself.
+
+Tasks can cover only part of a spec — it's fine for some pieces of work to be
+tasks and others to stay inline.
+
+Create another spec instead of another task when the work is no longer part of
+the same logical change and should be prioritized, reviewed, or delivered on its
+own. When the work still belongs to the same change, it is fine to keep a large
+spec.
+
+**Don't create a task when:**
+
+- The work is small enough to be done inline as part of implementing the spec.
+- You'd only put a title and no body — that's a smell. Either the work belongs
+  as a checklist item in the spec, or the task should describe what to do
+  (acceptance criteria, technical notes, gotchas).
+
+For simple specs, keep a TODO list directly in the spec body rather than
+creating a tree of empty task files.
+
+Do not duplicate the whole spec into each task. Tasks are for narrower details,
+follow-up notes, or sub-work that benefits from its own tracking, while the spec
+remains the canonical place for the overall scope and acceptance criteria.
+
 ## Tips for agents
 
 - Always start by running `pm next` to see all actionable work at a glance.
