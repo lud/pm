@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0] - 2026-06-02
+
+### 🚀 Features
+
+- Allow to read multiple documents with pm read
+
 ## [0.11.1] - 2026-05-28
 
 ### 🐛 Bug Fixes
