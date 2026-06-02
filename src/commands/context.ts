@@ -8,6 +8,7 @@ import {
 } from "../core/documents.js"
 import { parseDocumentRef } from "../core/scanner.js"
 import * as cli from "../lib/cli.js"
+import { formatContentSeparator } from "../lib/format.js"
 import { loadProjectFrom } from "../lib/project.js"
 import { displayDocumentRelations, formatDocumentHeader } from "./show.js"
 
@@ -58,10 +59,4 @@ export const contextCommand = command(
 
 function isResolved(entry: ChainEntry): entry is Document {
   return !("resolved" in entry && entry.resolved === false)
-}
-
-export function formatContentSeparator(label: string): string {
-  const prefix = `== CONTENT OF ${label} `
-  const width = Math.max(70, prefix.length + 1)
-  return prefix.padEnd(width, "=")
 }

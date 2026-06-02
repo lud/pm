@@ -36,8 +36,9 @@ vi.mock("../lib/project.js", async () => {
 })
 
 import * as cliMod from "../lib/cli.js"
+import { formatContentSeparator } from "../lib/format.js"
 import { loadProjectFrom } from "../lib/project.js"
-import { contextCommand, formatContentSeparator } from "./context.js"
+import { contextCommand } from "./context.js"
 
 const testProject = createTestProject("context-cmd")
 
@@ -229,22 +230,5 @@ describe("context command", () => {
         "abc",
       ]),
     ).toThrow("Invalid document ID")
-  })
-})
-
-describe("formatContentSeparator", () => {
-  it("pads to at least 60 characters", () => {
-    const result = formatContentSeparator("001.feat.auth.md")
-    expect(result.startsWith("== CONTENT OF 001.feat.auth.md ")).toBe(true)
-    expect(result).toMatch(/=+$/)
-    expect(result.length).toBeGreaterThanOrEqual(60)
-  })
-
-  it("extends beyond 60 for long filenames", () => {
-    const longName = "001.feat.a-very-long-feature-name-that-exceeds-limits.md"
-    const result = formatContentSeparator(longName)
-    expect(result.startsWith(`== CONTENT OF ${longName} `)).toBe(true)
-    expect(result.endsWith("=")).toBe(true)
-    expect(result.length).toBeGreaterThanOrEqual(60)
   })
 })

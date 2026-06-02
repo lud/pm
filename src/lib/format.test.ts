@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatPath } from "./format.js"
+import { formatContentSeparator, formatPath } from "./format.js"
 
 describe("formatPath", () => {
   it("returns relative path when child of cwd", () => {
@@ -26,5 +26,22 @@ describe("formatPath", () => {
 
   it("passes through already-relative paths", () => {
     expect(formatPath("src/file.ts", "/home/user/project")).toBe("src/file.ts")
+  })
+})
+
+describe("formatContentSeparator", () => {
+  it("pads to at least 60 characters", () => {
+    const result = formatContentSeparator("001.feat.auth.md")
+    expect(result.startsWith("== CONTENT OF 001.feat.auth.md ")).toBe(true)
+    expect(result).toMatch(/=+$/)
+    expect(result.length).toBeGreaterThanOrEqual(60)
+  })
+
+  it("extends beyond 60 for long filenames", () => {
+    const longName = "001.feat.a-very-long-feature-name-that-exceeds-limits.md"
+    const result = formatContentSeparator(longName)
+    expect(result.startsWith(`== CONTENT OF ${longName} `)).toBe(true)
+    expect(result.endsWith("=")).toBe(true)
+    expect(result.length).toBeGreaterThanOrEqual(60)
   })
 })

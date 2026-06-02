@@ -125,6 +125,7 @@ pm list --status waiting --is owner:alice  # Filter by exact status and property
 pm list --is priority:2    # Filter by numeric custom property
 pm context 003             # Show document details + full raw content of 003 and all its parents
 pm read 003                # Print full file contents of document 003
+pm read 023 024 021        # Print several documents at once, each under an unmissable header
 pm show 003                # Show document 003 title, status, path, parents and children
 pm current                 # Show the current document and its parents/children if any
 pm which                   # Print project directory path
@@ -168,7 +169,8 @@ pm current 003                               # Set document 003 as current
    work, or `pm next` to see all actionable work as a tree.
 2. **Check the current document**: read it with `pm context <id>`, understand
    the context. Using `pm context` repeatedly on children repeats all parents
-   documents. Prefer `pm read <id>` to read multiple documents in parallel.
+   documents. Prefer `pm read <id> <id> ...` to read several documents in one
+   call.
 3. **Do the work**: implement, write, review — whatever the document describes.
 4. **Mark done or blocked**:
    - `pm done <id>` when the work is complete.
@@ -250,6 +252,11 @@ remains the canonical place for the overall scope and acceptance criteria.
   document's hierarchy (like `pm show`) followed by the raw file contents
   (including frontmatter) of every parent and the document itself, from topmost
   parent down. This is the fastest way to load all relevant context in one call.
+- To read several documents at once, pass multiple IDs:
+  `pm read 023 024 021`. Each document is printed under an unmissable
+  `== CONTENT OF <file> ===` header (a single ID prints raw content with no
+  header). Use this instead of chaining separate `pm read` calls with manual
+  `echo` separators.
 - When creating specs or tasks, always provide the `--parent` flag with the parent ID.
 - When editing frontmatter directly, you may set `parent` to just the numeric ID
   like `1` as a shorthand, but the full `{id}.{tag}.{slug}` form is also valid

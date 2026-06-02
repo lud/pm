@@ -110,4 +110,50 @@ describe("read command", () => {
       cli({ name: "pm", commands: [readCommand] }, undefined, ["read", "xyz"]),
     ).toThrow("Invalid document ID")
   })
+
+  it("does not print a header for a single ID", () => {
+    cli({ name: "pm", commands: [readCommand] }, undefined, ["read", "1"])
+    const headers = vi
+      .mocked(cliMod.info)
+      .mock.calls.filter(([line]) => String(line).includes("CONTENT OF"))
+    expect(headers).toHaveLength(0)
+  })
+
+  it("prints a header per document when several IDs are given", () => {
+    cli({ name: "pm", commands: [readCommand] }, undefined, [
+      "read",
+      "1",
+      "2",
+      "4",
+    ])
+    const headers = vi
+      .mocked(cliMod.info)
+      .mock.calls.map(([line]) => String(line))
+      .filter((line) => line.includes("CONTENT OF"))
+    expect(headers).toHaveLength(3)
+    expect(headers[0]).toContain("001.feat.user-auth.md")
+    expect(headers[1]).toContain("002.spec.login-flow.md")
+    expect(headers[2]).toContain("004.task.session-store.md")
+  })
+
+  it("prints each document's content in order", () => {
+    cli({ name: "pm", commands: [readCommand] }, undefined, ["read", "1", "2"])
+    const bodies = vi
+      .mocked(cliMod.write)
+      .mock.calls.map(([line]) => String(line))
+    expect(bodies).toHaveLength(2)
+    expect(bodies[0]).toContain("title: User authentication")
+    expect(bodies[1]).toContain("title: Login flow")
+  })
+
+  it("aborts before any output if one of several IDs is missing", () => {
+    expect(() =>
+      cli({ name: "pm", commands: [readCommand] }, undefined, [
+        "read",
+        "1",
+        "999",
+      ]),
+    ).toThrow("Document 999 not found")
+    expect(cliMod.write).not.toHaveBeenCalled()
+  })
 })
