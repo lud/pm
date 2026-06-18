@@ -375,15 +375,19 @@ export async function buildTidyPlan(
         project.formatId,
       )
       edits.push({ path: doc.path, newParentRef: newRef })
-    } else if (typeof doc.frontmatter.parent === "number") {
-      // Bare numeric parent — expand to full reference
-      const newRef = formatParentRef(
+    } else {
+      // Normalize the parent ref to its canonical form. This expands bare
+      // numerics and rewrites full refs with stale slugs or wrong ID padding
+      // (e.g. "1.feat.foo" → "001.feat.foo").
+      const correctRef = formatParentRef(
         parent.id,
         parent.tag,
         parent.slug,
         project.formatId,
       )
-      edits.push({ path: doc.path, newParentRef: newRef })
+      if (doc.frontmatter.parent !== correctRef) {
+        edits.push({ path: doc.path, newParentRef: correctRef })
+      }
     }
   }
 

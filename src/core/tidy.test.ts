@@ -37,17 +37,17 @@ const BASIC_SETUP = {
       status: "new",
     },
     "context/features/001.feat.user-auth/002.spec.login-flow.md": {
-      parent: "1.feat.user-auth",
+      parent: "001.feat.user-auth",
       title: "Login flow",
       status: "new",
     },
     "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
-      parent: "2.spec.login-flow",
+      parent: "002.spec.login-flow",
       title: "Jwt middleware",
       status: "done",
     },
     "context/features/001.feat.user-auth/004.task.session-store.md": {
-      parent: "2.spec.login-flow",
+      parent: "002.spec.login-flow",
       title: "Session store",
       status: "new",
     },
@@ -346,7 +346,28 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
     expect(plan.edits[0].newParentRef).toBe("001.feat.test")
   })
 
-  it("does not edit a parent ref that is already a full reference", async () => {
+  it("does not edit a ref that is already canonical", async () => {
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.login.md": {
+          parent: "001.feat.test",
+          title: "Login",
+          status: "new",
+        },
+      },
+    })
+
+    const plan = await buildTidyPlan(project)
+
+    expect(plan.edits).toHaveLength(0)
+  })
+
+  it("repads the ID of a full reference with wrong padding", async () => {
     const { project } = testProject.setup({
       pmJson: { doctypes: BASIC_DOCTYPES },
       files: {
@@ -364,7 +385,52 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
 
     const plan = await buildTidyPlan(project)
 
-    expect(plan.edits).toHaveLength(0)
+    expect(plan.edits).toHaveLength(1)
+    expect(plan.edits[0].newParentRef).toBe("001.feat.test")
+  })
+
+  it("rewrites a stale slug in a full reference", async () => {
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.login.md": {
+          parent: "001.feat.old-slug",
+          title: "Login",
+          status: "new",
+        },
+      },
+    })
+
+    const plan = await buildTidyPlan(project)
+
+    expect(plan.edits).toHaveLength(1)
+    expect(plan.edits[0].newParentRef).toBe("001.feat.test")
+  })
+
+  it("fixes both wrong padding and a stale slug at once", async () => {
+    const { project } = testProject.setup({
+      pmJson: { doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.login.md": {
+          parent: "1.feat.old-slug",
+          title: "Login",
+          status: "new",
+        },
+      },
+    })
+
+    const plan = await buildTidyPlan(project)
+
+    expect(plan.edits).toHaveLength(1)
+    expect(plan.edits[0].newParentRef).toBe("001.feat.test")
   })
 
   it("pads the parent ID according to idMask width", async () => {
