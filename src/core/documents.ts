@@ -249,6 +249,7 @@ export function createDocument(
       parentDoc.id,
       parentDoc.tag,
       parentDoc.slug,
+      project.formatId,
     )
   }
 
@@ -313,6 +314,7 @@ export function editDocument(
       parentDoc.id,
       parentDoc.tag,
       parentDoc.slug,
+      project.formatId,
     )
   }
 
@@ -436,6 +438,7 @@ export function markBlocked(
       blockerDoc.id,
       blockerDoc.tag,
       blockerDoc.slug,
+      project.formatId,
     )
   }
 

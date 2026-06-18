@@ -344,6 +344,7 @@ export async function buildTidyPlan(
           newParentId,
           resolvedParent.tag,
           resolvedParent.slug,
+          project.formatId,
         )
         // Only add edit if the ref actually changes
         const currentRef = child.frontmatter.parent
@@ -367,11 +368,21 @@ export async function buildTidyPlan(
     const parentNewId = idRemapping.get(parent.path)
     if (parentNewId !== undefined) {
       // Parent's ID changed — update the child's parent ref
-      const newRef = formatParentRef(parentNewId, parent.tag, parent.slug)
+      const newRef = formatParentRef(
+        parentNewId,
+        parent.tag,
+        parent.slug,
+        project.formatId,
+      )
       edits.push({ path: doc.path, newParentRef: newRef })
     } else if (typeof doc.frontmatter.parent === "number") {
       // Bare numeric parent — expand to full reference
-      const newRef = formatParentRef(parent.id, parent.tag, parent.slug)
+      const newRef = formatParentRef(
+        parent.id,
+        parent.tag,
+        parent.slug,
+        project.formatId,
+      )
       edits.push({ path: doc.path, newParentRef: newRef })
     }
   }
@@ -453,7 +464,12 @@ export function resolveOrphan(
   parent: DocumentEntry,
 ): void {
   // 1. Write parent ref to frontmatter
-  const parentRef = formatParentRef(parent.id, parent.tag, parent.slug)
+  const parentRef = formatParentRef(
+    parent.id,
+    parent.tag,
+    parent.slug,
+    project.formatId,
+  )
   const content = readFileSync(orphan.path, "utf-8")
   const { data, bodyWithoutFM } = parseFrontmatter(content)
   data.parent = parentRef

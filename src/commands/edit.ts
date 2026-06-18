@@ -113,6 +113,7 @@ export const editCommand = command(
         blockerDoc.id,
         blockerDoc.tag,
         blockerDoc.slug,
+        project.formatId,
       )
     }
 

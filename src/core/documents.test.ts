@@ -302,7 +302,7 @@ describe("createDocument", () => {
     expect(result.id).toBe(5)
     const content = readFileSync(result.path, "utf-8")
     const { data } = parseFrontmatter(content)
-    expect(data.parent).toBe("1.feat.user-auth")
+    expect(data.parent).toBe("001.feat.user-auth")
     expect(data.parent).not.toBe(1)
     expect(data.title).toBe("API design")
   })
@@ -316,7 +316,7 @@ describe("createDocument", () => {
     expect(result.id).toBe(5)
     const content = readFileSync(result.path, "utf-8")
     const { data } = parseFrontmatter(content)
-    expect(data.parent).toBe("2.spec.login-flow")
+    expect(data.parent).toBe("002.spec.login-flow")
   })
 
   it("throws when required parent is missing", () => {
@@ -460,7 +460,7 @@ describe("editDocument", () => {
   it("sets parent as ref string", () => {
     const { project } = testProject.setup(BASIC_SETUP)
     const { document: doc } = editDocument(project, 4, { setParent: 2 })
-    expect(doc.frontmatter.parent).toBe("2.spec.login-flow")
+    expect(doc.frontmatter.parent).toBe("002.spec.login-flow")
   })
 
   it("throws when setting parent to wrong doctype", () => {
@@ -630,7 +630,7 @@ describe("markBlocked", () => {
     const { project } = testProject.setup(BASIC_SETUP)
     const doc = markBlocked(project, 4, { blockedBy: 3 })
     expect(doc.frontmatter.status).toBe("blocked")
-    expect(doc.frontmatter.blocked_by).toBe("3.task.jwt-middleware")
+    expect(doc.frontmatter.blocked_by).toBe("003.task.jwt-middleware")
   })
 
   it("throws when blockedBy document does not exist", () => {

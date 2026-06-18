@@ -158,7 +158,7 @@ describe("blocked command", () => {
     )
     const { data } = parseFrontmatter(content)
     expect(data.status).toBe("blocked")
-    expect(data.blocked_by).toBe("3.task.jwt-middleware")
+    expect(data.blocked_by).toBe("003.task.jwt-middleware")
     expect(cliMod.info).not.toHaveBeenCalledWith(expect.stringContaining("Tip"))
   })
 

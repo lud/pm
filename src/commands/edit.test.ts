@@ -234,7 +234,7 @@ describe("edit command", () => {
     )
     const { data } = parseFrontmatter(content)
     expect(data.status).toBe("blocked")
-    expect(data.blocked_by).toBe("3.task.jwt-middleware")
+    expect(data.blocked_by).toBe("003.task.jwt-middleware")
   })
 
   it("aborts when --blocked-by is given without --set status", () => {

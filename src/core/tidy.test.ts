@@ -229,10 +229,11 @@ describe("buildTidyPlan with duplicates", () => {
     const { project } = testProject.setup(DUPE_SETUP)
     const plan = await buildTidyPlan(project)
 
-    // Task 003 references "2.spec.login" — auto-resolves to login spec
-    // Login keeps ID 2, so no edit needed for this child
+    // Task 003 references "2.spec.login" — auto-resolves to login spec.
+    // Login keeps ID 2, but the ref is rewritten with the padded ID.
     const taskEdits = plan.edits.filter((e) => e.path.includes("003.task"))
-    expect(taskEdits).toHaveLength(0)
+    expect(taskEdits).toHaveLength(1)
+    expect(taskEdits[0].newParentRef).toBe("002.spec.login")
   })
 
   it("generates a move for the renamed duplicate", async () => {
@@ -342,7 +343,7 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
     const plan = await buildTidyPlan(project)
 
     expect(plan.edits).toHaveLength(1)
-    expect(plan.edits[0].newParentRef).toBe("1.feat.test")
+    expect(plan.edits[0].newParentRef).toBe("001.feat.test")
   })
 
   it("does not edit a parent ref that is already a full reference", async () => {
@@ -364,6 +365,28 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
     const plan = await buildTidyPlan(project)
 
     expect(plan.edits).toHaveLength(0)
+  })
+
+  it("pads the parent ID according to idMask width", async () => {
+    const { project } = testProject.setup({
+      pmJson: { idMask: "000", doctypes: BASIC_DOCTYPES },
+      files: {
+        "context/features/001.feat.test/001.feat.test.md": {
+          title: "Test",
+          status: "new",
+        },
+        "context/features/001.feat.test/002.spec.login.md": {
+          parent: 1,
+          title: "Login",
+          status: "new",
+        },
+      },
+    })
+
+    const plan = await buildTidyPlan(project)
+
+    expect(plan.edits).toHaveLength(1)
+    expect(plan.edits[0].newParentRef).toBe("001.feat.test")
   })
 
   it("applies bare parent fix end-to-end", async () => {
@@ -389,7 +412,7 @@ describe("buildTidyPlan with bare numeric parent refs", () => {
     const featDir = join(dir, "context", "features", "001.feat.test")
     const content = readFileSync(join(featDir, "002.spec.login.md"), "utf-8")
     const { data } = parseFrontmatter(content)
-    expect(data.parent).toBe("1.feat.test")
+    expect(data.parent).toBe("001.feat.test")
 
     // Verify idempotent
     const project2 = reloadProject(dir)
@@ -446,8 +469,8 @@ describe("buildTidyPlan with ambiguous duplicate parent", () => {
     // Should have an edit for the child updating to alpha's (possibly new) ID
     const childEdits = plan.edits.filter((e) => e.path.includes("003.task"))
     expect(childEdits).toHaveLength(1)
-    // Alpha keeps ID 2 (first by path), so ref should be "2.spec.alpha"
-    expect(childEdits[0].newParentRef).toBe("2.spec.alpha")
+    // Alpha keeps ID 2 (first by path), so ref should be "002.spec.alpha"
+    expect(childEdits[0].newParentRef).toBe("002.spec.alpha")
   })
 })
 
@@ -517,10 +540,10 @@ describe("applyTidyPlan", () => {
     const betaMapping = plan.mappings.find((m) => m.doc.slug === "beta")
     expect(betaMapping!.newId).toBe(4)
 
-    // Child should have an edit to update parent ref to "4.spec.beta"
+    // Child should have an edit to update parent ref to "004.spec.beta"
     const childEdits = plan.edits.filter((e) => e.path.includes("003.task"))
     expect(childEdits).toHaveLength(1)
-    expect(childEdits[0].newParentRef).toBe("4.spec.beta")
+    expect(childEdits[0].newParentRef).toBe("004.spec.beta")
 
     // Apply and verify
     applyTidyPlan(plan)
@@ -531,7 +554,7 @@ describe("applyTidyPlan", () => {
     expect(child).toBeDefined()
     const childContent = readFileSync(child!.path, "utf-8")
     const { data } = parseFrontmatter(childContent)
-    expect(data.parent).toBe("4.spec.beta")
+    expect(data.parent).toBe("004.spec.beta")
   })
 
   it("is idempotent — running twice produces no further changes", async () => {

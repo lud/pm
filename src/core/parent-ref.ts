@@ -16,9 +16,17 @@ const PARENT_REF_REGEX = /^(\d+)\.([a-zA-Z][a-zA-Z0-9]*)\.(.+)$/
 
 /**
  * Format a parent reference string from components.
+ *
+ * Pass the project's `formatId` so the ID is rendered with the same
+ * zero-padding as filenames; defaults to no padding when omitted.
  */
-export function formatParentRef(id: number, tag: string, slug: string): string {
-  return `${id}.${tag}.${slug}`
+export function formatParentRef(
+  id: number,
+  tag: string,
+  slug: string,
+  formatId: (id: number) => string = String,
+): string {
+  return `${formatId(id)}.${tag}.${slug}`
 }
 
 /**

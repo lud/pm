@@ -10,8 +10,20 @@ describe("formatParentRef", () => {
     expect(formatParentRef(1, "feat", "user-auth")).toBe("1.feat.user-auth")
   })
 
-  it("does not zero-pad the ID", () => {
+  it("does not zero-pad the ID by default", () => {
     expect(formatParentRef(5, "spec", "login")).toBe("5.spec.login")
+  })
+
+  it("formats the ID with the supplied formatId", () => {
+    const formatId = (id: number) => String(id).padStart(3, "0")
+    expect(formatParentRef(5, "spec", "login", formatId)).toBe("005.spec.login")
+  })
+
+  it("lets formatId pass through IDs wider than the pad width", () => {
+    const formatId = (id: number) => String(id).padStart(3, "0")
+    expect(formatParentRef(1234, "spec", "login", formatId)).toBe(
+      "1234.spec.login",
+    )
   })
 })
 
