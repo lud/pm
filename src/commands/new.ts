@@ -1,11 +1,12 @@
 import { execSync } from "node:child_process"
 import { command } from "cleye"
+import { loadProjectFrom, type ResolvedProject } from "../core/config.js"
 import { touchCurrent } from "../core/current.js"
-import { createDocument } from "../core/documents.js"
-import { parseDocumentRef } from "../core/scanner.js"
+import { createDocument } from "../core/docs.js"
+import { resolveGuide } from "../core/guides.js"
+import { parseRefId } from "../core/refs.js"
 import * as cli from "../lib/cli.js"
 import { formatPath } from "../lib/format.js"
-import { loadProjectFrom } from "../lib/project.js"
 import {
   flagsToRecord,
   type PropertyFlag,
@@ -23,7 +24,7 @@ const RESERVED_NEW_PROPERTIES: Record<string, (s: PropertyValue) => string> = {
 export const newCommand = command(
   {
     name: "new",
-    parameters: ["<doctype>", "<title...>"],
+    parameters: ["<type>", "<title...>"],
     flags: {
       parent: {
         type: String,
@@ -48,14 +49,20 @@ export const newCommand = command(
     },
   },
   (argv) => {
-    const project = loadProjectFrom(process.cwd())
-    const doctypeName = argv._.doctype
+    let project: ResolvedProject
+    try {
+      project = loadProjectFrom(process.cwd())
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
+
+    const typeName = argv._.type
     const titleParts = argv._.title as unknown as string[]
     const title = titleParts.join(" ")
 
     let parentId: number | undefined
     if (argv.flags.parent) {
-      parentId = parseDocumentRef(argv.flags.parent) ?? undefined
+      parentId = parseRefId(argv.flags.parent) ?? undefined
       if (parentId === undefined) {
         cli.abortError(`Invalid parent ID: "${argv.flags.parent}"`)
       }
@@ -82,7 +89,9 @@ export const newCommand = command(
     const setProperties = flagsToRecord(flags)
 
     try {
-      const result = createDocument(project, doctypeName, title, {
+      const result = createDocument(project, {
+        type: typeName,
+        title,
         parentId,
         status: argv.flags.status ?? undefined,
         setProperties:
@@ -92,6 +101,11 @@ export const newCommand = command(
       touchCurrent(project.projectDir)
       const displayPath = formatPath(result.path, process.cwd())
       cli.success(`Created ${displayPath}`)
+
+      const guide = resolveGuide(project, result.type)
+      if (guide) {
+        cli.info(`Guide: ${formatPath(guide.path, process.cwd())}`)
+      }
 
       if (argv.flags.editor) {
         const editor = process.env.PM_EDITOR ?? process.env.EDITOR

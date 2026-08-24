@@ -1,5 +1,5 @@
 import { cli } from "cleye"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createTestProject } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {
@@ -25,137 +25,187 @@ vi.mock("../lib/cli.js", async () => {
   }
 })
 
-vi.mock("../lib/project.js", async () => {
-  const actual = (await vi.importActual("../lib/project.js")) as Record<
+vi.mock("../core/config.js", async () => {
+  const actual = (await vi.importActual("../core/config.js")) as Record<
     string,
     unknown
   >
   return { ...actual, loadProjectFrom: vi.fn() }
 })
 
+import { loadProjectFrom } from "../core/config.js"
 import * as cliMod from "../lib/cli.js"
-import { loadProjectFrom } from "../lib/project.js"
 import { statusCommand } from "./status.js"
 
 const testProject = createTestProject("status-cmd")
 
-const BASIC_SETUP = {
-  pmJson: {
-    doctypes: {
-      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-      spec: { tag: "spec", dir: ".", parent: "feature" },
-      task: { tag: "task", dir: ".", parent: "spec" },
+const PM_JSON = {
+  directory: "docs",
+  types: {
+    feature: { tag: "feat" },
+    task: { tag: "task" },
+    decision: {
+      tag: "adr",
+      defaultStatus: "draft",
+      doneStatuses: ["accepted"],
     },
   },
-  files: {
-    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
-      title: "User authentication",
-      status: "new",
-      created_on: "2026-03-20",
-    },
-    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
-      parent: "1.feat.user-auth",
-      title: "Login flow",
-      status: "new",
-      created_on: "2026-03-20",
-    },
-    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
-      parent: "2.spec.login-flow",
-      title: "Add JWT middleware",
-      status: "done",
-      created_on: "2026-03-21",
-    },
-    "context/features/001.feat.user-auth/004.task.session-store.md": {
-      parent: "2.spec.login-flow",
-      title: "Session store",
-      status: "new",
-      created_on: "2026-03-21",
-    },
-  },
-} as const
-
-const MULTI_STATUS_SETUP = {
-  pmJson: {
-    doctypes: {
-      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-      spec: { tag: "spec", dir: ".", parent: "feature" },
-      task: { tag: "task", dir: ".", parent: "spec" },
-    },
-  },
-  files: {
-    "context/features/001.feat.auth/001.feat.auth.md": {
-      title: "Authentication",
-      status: "in-progress",
-    },
-    "context/features/001.feat.auth/002.spec.login.md": {
-      parent: "1.feat.auth",
-      title: "Login flow",
-      status: "specified",
-    },
-    "context/features/001.feat.auth/003.spec.signup.md": {
-      parent: "1.feat.auth",
-      title: "Signup flow",
-      status: "new",
-    },
-    "context/features/001.feat.auth/004.task.jwt.md": {
-      parent: "2.spec.login",
-      title: "JWT middleware",
-      status: "done",
-    },
-    "context/features/001.feat.auth/006.task.session.md": {
-      parent: "2.spec.login",
-      title: "Session store",
-      status: "in-progress",
-    },
-    "context/features/001.feat.auth/007.task.hash.md": {
-      parent: "3.spec.signup",
-      title: "Password hashing",
-      status: "new",
-    },
-    "context/features/001.feat.auth/008.task.validate.md": {
-      parent: "3.spec.signup",
-      title: "Input validation",
-      status: "done",
-    },
-    "context/features/005.feat.payments/005.feat.payments.md": {
-      title: "Payments",
-      status: "new",
-    },
-  },
-} as const
+}
 
 function infoLines(): string[] {
   return vi.mocked(cliMod.info).mock.calls.map(([msg]) => msg)
 }
 
+function infoOutput(): string {
+  return infoLines().join("\n")
+}
+
+function warningLines(): string[] {
+  return vi.mocked(cliMod.warning).mock.calls.map(([msg]) => msg)
+}
+
 describe("status command", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
   it("shows status summary for basic project", () => {
-    vi.clearAllMocks()
-    const { dir, project } = testProject.setup(BASIC_SETUP)
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      files: {
+        "docs/001.feat.auth.md": { title: "Auth", status: "new" },
+        "docs/002.task.login.md": {
+          parent: "1.feat.auth",
+          title: "Login",
+          status: "new",
+        },
+      },
+    })
     vi.spyOn(process, "cwd").mockReturnValue(dir)
     vi.mocked(loadProjectFrom).mockReturnValue(project)
 
     cli({ name: "pm", commands: [statusCommand] }, undefined, ["status"])
-    const lines = infoLines()
-    const output = lines.join("\n")
+    const output = infoOutput()
     expect(output).toContain("feature")
+    expect(output).toContain("task")
     expect(output).toContain("new")
   })
 
-  it("shows status breakdown for multi-status project", () => {
-    vi.clearAllMocks()
-    const { dir, project } = testProject.setup(MULTI_STATUS_SETUP)
+  it("shows the status breakdown with per-type done statuses", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      files: {
+        "docs/001.feat.auth.md": { title: "Auth", status: "in-progress" },
+        "docs/002.task.login.md": {
+          parent: "1.feat.auth",
+          title: "Login",
+          status: "new",
+        },
+        "docs/003.task.jwt.md": {
+          parent: "1.feat.auth",
+          title: "JWT",
+          status: "done",
+        },
+        "docs/004.adr.choice.md": { title: "Choice", status: "accepted" },
+        "docs/005.adr.other.md": { title: "Other", status: "draft" },
+      },
+    })
     vi.spyOn(process, "cwd").mockReturnValue(dir)
     vi.mocked(loadProjectFrom).mockReturnValue(project)
 
     cli({ name: "pm", commands: [statusCommand] }, undefined, ["status"])
-    const lines = infoLines()
-    const output = lines.join("\n")
-    // multi-status fixture has multiple status values
+    const output = infoOutput()
     expect(output).toContain("feature")
+    expect(output).toContain("task")
+    expect(output).toContain("decision")
+    // the adr type's own doneStatuses (["accepted"]) mark this status done,
+    // even though the literal string isn't "done"
+    expect(output).toContain("accepted [done]")
+    expect(output).toContain("draft")
+  })
+
+  it("prints legacy-config warnings before the breakdown", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: {
+        directory: "docs",
+        doctypes: {
+          feature: { tag: "feat" },
+        },
+      },
+      files: {
+        "docs/001.feat.auth.md": { title: "Auth", status: "new" },
+      },
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    cli({ name: "pm", commands: [statusCommand] }, undefined, ["status"])
+    expect(warningLines().join("\n")).toContain("doctypes")
+  })
+
+  it("shows the current-document section when current is a doc", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      pmCurrent: 2,
+      files: {
+        "docs/001.feat.auth.md": { title: "Auth", status: "new" },
+        "docs/002.task.login.md": {
+          parent: "1.feat.auth",
+          title: "Login",
+          status: "new",
+        },
+      },
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    cli({ name: "pm", commands: [statusCommand] }, undefined, ["status"])
+    const output = infoOutput()
+    expect(output).toContain("Current document:")
+    expect(output).toContain("002 task Login (new)")
+    expect(output).toContain("Parents:")
+    expect(output).toContain("feature 001 Auth (new)")
+  })
+
+  it("shows the current-document section when current is a group", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      pmCurrent: 10,
+      files: {
+        "docs/010.stuff/011.task.a.md": {
+          parent: "10.stuff",
+          title: "A",
+          status: "new",
+        },
+      },
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    cli({ name: "pm", commands: [statusCommand] }, undefined, ["status"])
+    const output = infoOutput()
+    expect(output).toContain("Current document:")
+    expect(output).toContain("010 group stuff")
+    expect(output).toContain("Children:")
+    expect(output).toContain("task 011 A (new)")
+  })
+
+  it("warns when the current document ID no longer resolves", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      pmCurrent: 99,
+      files: {
+        "docs/001.feat.auth.md": { title: "Auth", status: "new" },
+      },
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    cli({ name: "pm", commands: [statusCommand] }, undefined, ["status"])
+    expect(warningLines().join("\n")).toContain("Current document 99 not found")
   })
 })

@@ -25,54 +25,27 @@ vi.mock("../lib/cli.js", async () => {
   }
 })
 
-vi.mock("../lib/project.js", async () => {
-  const actual = (await vi.importActual("../lib/project.js")) as Record<
+vi.mock("../core/config.js", async () => {
+  const actual = (await vi.importActual("../core/config.js")) as Record<
     string,
     unknown
   >
   return { ...actual, loadProjectFrom: vi.fn() }
 })
 
+import { loadProjectFrom } from "../core/config.js"
 import * as cliMod from "../lib/cli.js"
-import { loadProjectFrom } from "../lib/project.js"
 import { showCommand } from "./show.js"
 
 const testProject = createTestProject("show-cmd")
 
-const BASIC_SETUP = {
-  pmJson: {
-    doctypes: {
-      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-      spec: { tag: "spec", dir: ".", parent: "feature" },
-      task: { tag: "task", dir: ".", parent: "spec" },
-    },
+const PM_JSON = {
+  directory: "docs",
+  types: {
+    feature: { tag: "feat" },
+    task: { tag: "task" },
   },
-  files: {
-    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
-      title: "User authentication",
-      status: "new",
-      created_on: "2026-03-20",
-    },
-    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
-      parent: "1.feat.user-auth",
-      title: "Login flow",
-      status: "new",
-      created_on: "2026-03-20",
-    },
-    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
-      parent: "2.spec.login-flow",
-      title: "Add JWT middleware",
-      status: "done",
-      created_on: "2026-03-21",
-    },
-    "context/features/001.feat.user-auth/004.task.session-store.md": {
-      parent: "2.spec.login-flow",
-      title: "Session store",
-      status: "new",
-      created_on: "2026-03-21",
-    },
-  },
-} as const
+}
 
 function infoOutput(): string {
   return vi
@@ -82,110 +55,153 @@ function infoOutput(): string {
 }
 
 describe("show command", () => {
-  let dir: string
-
   beforeEach(() => {
     vi.clearAllMocks()
-    const setup = testProject.setup(BASIC_SETUP)
-    dir = setup.dir
-    vi.spyOn(process, "cwd").mockReturnValue(dir)
-    vi.mocked(loadProjectFrom).mockReturnValue(setup.project)
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it("displays a feature with children", () => {
-    cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "1"])
-    expect(infoOutput()).toBe(
-      dedent(`
-      001 feature User authentication (new)
-      in context/features/001.feat.user-auth/001.feat.user-auth.md
+  it("shows a doc with a group-then-doc parent chain and its children", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      files: {
+        "docs/010.stuff/002.feat.auth.md": {
+          parent: "10.stuff",
+          title: "Auth",
+          status: "new",
+        },
+        "docs/010.stuff/003.task.login.md": {
+          parent: "2.feat.auth",
+          title: "Login",
+          status: "new",
+        },
+        "docs/010.stuff/004.task.logout.md": {
+          parent: "2.feat.auth",
+          title: "Logout",
+          status: "new",
+        },
+      },
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
 
-      Children:
-        spec 002 Login flow (new)
-      `),
-    )
-  })
-
-  it("displays a spec with parents and children", () => {
     cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "2"])
     expect(infoOutput()).toBe(
       dedent(`
-      002 spec Login flow (new)
-      in context/features/001.feat.user-auth/002.spec.login-flow.md
+      002 feature Auth (new)
+      in docs/010.stuff/002.feat.auth.md
 
       Parents:
-        feature 001 User authentication (new)
+        group 010 stuff
 
       Children:
-        task 003 Add JWT middleware (done)
-        task 004 Session store (new)
+        task 003 Login (new)
+        task 004 Logout (new)
+      `),
+    )
+
+    vi.mocked(cliMod.info).mockClear()
+    cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "3"])
+    expect(infoOutput()).toBe(
+      dedent(`
+      003 task Login (new)
+      in docs/010.stuff/003.task.login.md
+
+      Parents:
+        group 010 stuff
+        feature 002 Auth (new)
       `),
     )
   })
 
-  it("displays a leaf task with parents only", () => {
-    cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "3"])
+  it("shows a group with its member children", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      files: {
+        "docs/010.stuff/011.task.a.md": {
+          parent: "10.stuff",
+          title: "A",
+          status: "new",
+        },
+        "docs/012.feat.other.md": { title: "Other", status: "new" },
+      },
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "10"])
     expect(infoOutput()).toBe(
       dedent(`
-      003 task Add JWT middleware (done)
-      in context/features/001.feat.user-auth/003.task.jwt-middleware.md
+      010 group stuff
+      in docs/010.stuff
 
-      Parents:
-        feature 001 User authentication (new)
-        spec 002 Login flow (new)
+      Children:
+        task 011 A (new)
       `),
     )
   })
 
   it("accepts zero-padded IDs", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      files: {
+        "docs/001.feat.auth.md": { title: "Auth", status: "new" },
+      },
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
     cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "001"])
-    const output = infoOutput()
-    expect(output).toContain("001 feature User authentication")
+    expect(infoOutput()).toContain("001 feature Auth")
   })
 
   it("aborts on non-existent document", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      dirs: ["docs"],
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
     expect(() =>
       cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "999"]),
     ).toThrow("Document 999 not found")
   })
 
   it("aborts on invalid ID", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      dirs: ["docs"],
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
     expect(() =>
       cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "abc"]),
     ).toThrow("Invalid document ID")
   })
 
-  it("displays missing parent in parent chain", () => {
-    const setup = testProject.setup({
-      pmJson: {
-        doctypes: {
-          feature: {
-            tag: "feat",
-            dir: "context/features",
-            intermediateDir: true,
-          },
-          spec: { tag: "spec", dir: ".", parent: "feature" },
-        },
-      },
+  it("displays a missing parent in the parent chain", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
       files: {
-        "context/features/002.feat.ghost/002.feat.ghost.md": {
+        "docs/002.feat.ghost.md": {
           title: "Ghost feature",
           status: "new",
           parent: "999.feat.missing",
         },
       },
     })
-    vi.mocked(loadProjectFrom).mockReturnValue(setup.project)
-    vi.spyOn(process, "cwd").mockReturnValue(setup.dir)
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
 
     cli({ name: "pm", commands: [showCommand] }, undefined, ["show", "2"])
     expect(infoOutput()).toBe(
       dedent(`
       002 feature Ghost feature (new)
-      in context/features/002.feat.ghost/002.feat.ghost.md
+      in docs/002.feat.ghost.md
 
       Parents:
         999 (not found)

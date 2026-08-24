@@ -1,15 +1,15 @@
 import { command } from "cleye"
+import { loadProjectFrom, type ResolvedProject } from "../core/config.js"
 import {
   clearCurrentId,
   getCurrentId,
   setCurrentId,
   touchCurrent,
 } from "../core/current.js"
-import { showDocument } from "../core/documents.js"
-import { parseDocumentRef } from "../core/scanner.js"
+import { type ShowResult, showNode } from "../core/docs.js"
+import { parseRefId } from "../core/refs.js"
 import * as cli from "../lib/cli.js"
-import { loadProjectFrom } from "../lib/project.js"
-import { displayDocumentRelations, formatDocumentHeader } from "./show.js"
+import { displayShowResult } from "./show.js"
 
 export const currentCommand = command(
   {
@@ -17,20 +17,25 @@ export const currentCommand = command(
     parameters: ["[id]"],
   },
   (argv) => {
-    const project = loadProjectFrom(process.cwd())
+    let project: ResolvedProject
+    try {
+      project = loadProjectFrom(process.cwd())
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
 
     let id: number | null
 
     if (argv._.id) {
-      // Set current document
-      id = parseDocumentRef(argv._.id)
+      // Set current node — a doc or a group
+      id = parseRefId(argv._.id)
       if (id === null) {
         cli.abortError(`Invalid document ID: "${argv._.id}"`)
       }
       setCurrentId(project.projectDir, id)
       touchCurrent(project.projectDir)
     } else {
-      // Show current document
+      // Show current node
       id = getCurrentId(project.projectDir)
       if (id === null) {
         cli.info(
@@ -40,16 +45,19 @@ export const currentCommand = command(
       }
     }
 
-    const result = showDocument(project, id)
+    let result: ShowResult | null
+    try {
+      result = showNode(project, id)
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
+
     if (!result) {
       cli.warning(`Current document ${id} not found. Clearing.`)
       clearCurrentId(project.projectDir)
       return
     }
 
-    const fmtId = project.formatId
-    const cwd = process.cwd()
-    cli.info(formatDocumentHeader(result.document, cwd, fmtId))
-    displayDocumentRelations(result, fmtId)
+    displayShowResult(project, result, process.cwd())
   },
 )

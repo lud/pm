@@ -25,47 +25,50 @@ vi.mock("../lib/cli.js", async () => {
   }
 })
 
-vi.mock("../lib/project.js", async () => {
-  const actual = (await vi.importActual("../lib/project.js")) as Record<
+vi.mock("../core/config.js", async () => {
+  const actual = (await vi.importActual("../core/config.js")) as Record<
     string,
     unknown
   >
   return { ...actual, loadProjectFrom: vi.fn() }
 })
 
+import { loadProjectFrom } from "../core/config.js"
 import * as cliMod from "../lib/cli.js"
-import { loadProjectFrom } from "../lib/project.js"
 import { readCommand } from "./read.js"
 
 const testProject = createTestProject("read-cmd")
 
-const BASIC_SETUP = {
-  pmJson: {
-    doctypes: {
-      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-      spec: { tag: "spec", dir: ".", parent: "feature" },
-      task: { tag: "task", dir: ".", parent: "spec" },
-    },
+const PM_JSON = {
+  directory: "docs",
+  types: {
+    feature: { tag: "feat" },
+    spec: { tag: "spec" },
+    task: { tag: "task" },
   },
+}
+
+const BASIC_SETUP = {
+  pmJson: PM_JSON,
   files: {
-    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
+    "docs/001.feat.user-auth.md": {
       title: "User authentication",
       status: "new",
       created_on: "2026-03-20",
     },
-    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
+    "docs/002.spec.login-flow.md": {
       parent: "1.feat.user-auth",
       title: "Login flow",
       status: "new",
       created_on: "2026-03-20",
     },
-    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
+    "docs/003.task.jwt-middleware.md": {
       parent: "2.spec.login-flow",
       title: "Add JWT middleware",
       status: "done",
       created_on: "2026-03-21",
     },
-    "context/features/001.feat.user-auth/004.task.session-store.md": {
+    "docs/004.task.session-store.md": {
       parent: "2.spec.login-flow",
       title: "Session store",
       status: "new",
@@ -154,6 +157,20 @@ describe("read command", () => {
         "999",
       ]),
     ).toThrow("Document 999 not found")
+    expect(cliMod.write).not.toHaveBeenCalled()
+  })
+
+  it("rejects a group ID with a dedicated message", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      dirs: ["docs/010.backlog"],
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+
+    expect(() =>
+      cli({ name: "pm", commands: [readCommand] }, undefined, ["read", "10"]),
+    ).toThrow("Node 10 is a group directory, not a document")
     expect(cliMod.write).not.toHaveBeenCalled()
   })
 })

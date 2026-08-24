@@ -1,9 +1,11 @@
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { z } from "zod"
-import { ProjectConfigSchema } from "../src/lib/project.js"
+import { StrictProjectConfigSchema } from "../src/core/config.js"
 
-const jsonSchema = z.toJSONSchema(ProjectConfigSchema, {
+// The published schema is the strict v2 one: editors flag legacy keys,
+// while the loader stays tolerant.
+const jsonSchema = z.toJSONSchema(StrictProjectConfigSchema, {
   target: "draft-2020-12",
   io: "input",
 })

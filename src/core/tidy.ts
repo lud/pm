@@ -1,509 +1,448 @@
-import { readdirSync, readFileSync, rmdirSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { parseFrontmatter, prependFrontmatter } from "../lib/frontmatter.js"
+import { basename, dirname, join } from "node:path"
+import { setFrontmatterProperties } from "../lib/frontmatter.js"
 import {
-  mkdirSyncOrAbort,
-  renameSyncOrAbort,
-  writeFileSyncOrAbort,
+  mkdirSyncOrThrow,
+  readdirSyncOrThrow,
+  readFileSyncOrThrow,
+  renameSyncOrThrow,
+  rmdirSyncOrThrow,
+  writeFileSyncOrThrow,
 } from "../lib/fs-helpers.js"
-import type { ResolvedProject } from "../lib/project.js"
+import type { ResolvedProject } from "./config.js"
+import { type DocInfo, loadDocInfo, slugify } from "./docs.js"
 import {
-  computeExpectedPath,
-  type Document,
-  renameDocument,
-} from "./documents.js"
+  type DocNode,
+  formatDocFilename,
+  type GroupNode,
+  maxNodeId,
+  type Node,
+  type ScanResult,
+  scanNodes,
+} from "./nodes.js"
 import {
-  formatParentRef,
-  parseFrontmatterId,
-  parseParentRef,
-} from "./parent-ref.js"
-import { formatDocumentFilename, scanDocuments } from "./scanner.js"
+  formatDocRef,
+  formatGroupRef,
+  parseDepends,
+  parseNodeRef,
+  parseRefId,
+} from "./refs.js"
+
+/**
+ * Tidy. Two phases: buildTidyPlan
+ * computes everything without touching disk; applyTidyPlan executes.
+ *
+ * The plan converges a project in one run:
+ *  1. ID collisions across ALL nodes (docs and groups share the
+ *     sequence): among colliders, the first doc in path order keeps the
+ *     ID; the other docs (path order), then the groups (path order),
+ *     take fresh IDs from maxId+1.
+ *  2. Every group directory is renamed to its expected `{paddedId}.{slug}`
+ *     name — this rewrites legacy `{id}.{tag}.{slug}` dirs tag-less and
+ *     applies renumbering in one rename.
+ *  3. Parent refs are rewritten to canonical qualified padded form
+ *     against the actual target node (bare numerics expanded, stale
+ *     hints healed, renumbered targets followed). For a ref to a
+ *     duplicated ID, the slug hint (slug only — the tag may have
+ *     drifted) picks the candidate; an ambiguous ref falls back
+ *     to the prompt, else a warning and the ref is left untouched.
+ *  4. Adoption: a doc inside a group dir with no parent ref gets
+ *     `parent: {group-ref}`.
+ *  5. depends entries are rewritten to canonical refs with remapped IDs;
+ *     entries resolving to a group, to nothing, or malformed produce a
+ *     warning and stay verbatim (warn, never fix).
+ *  6. Docs move to their expected path: parent doc's directory, parent
+ *     group's (renamed) directory, or the root; filenames heal slug
+ *     drift against the title. A doc with an unresolvable parent ref
+ *     stays where it is (warning).
+ *
+ * Apply order: frontmatter edits (at current paths), then group dir
+ *  renames, then doc moves (whose `from` paths already account for the
+ *  renames), then empty source dirs are removed bottom-up.
+ */
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type DocumentEntry = Document & {
-  parentId: number | null
-}
-
-export type TidyMapping = {
-  doc: DocumentEntry
+export type GroupRename = {
+  group: GroupNode
   newId: number
-  newPath: string
-  idChanged: boolean
-  pathChanged: boolean
-}
-
-export type TidyEditOp = {
-  /** Path to edit (before any moves) */
-  path: string
-  /** New parent ref string to write */
-  newParentRef: string
-}
-
-export type TidyMoveOp = {
   from: string
   to: string
 }
 
+export type TidyEdit = {
+  /** Pre-rename absolute path of the file to edit. */
+  path: string
+  /** Frontmatter keys to set (parent and/or depends). */
+  updates: Record<string, unknown>
+}
+
+export type DocMove = {
+  doc: DocNode
+  /** Where the file will be once group renames have run. */
+  from: string
+  to: string
+}
+
+export type Renumbering = {
+  node: Node
+  newId: number
+}
+
 export type TidyPlan = {
-  mappings: TidyMapping[]
-  edits: TidyEditOp[]
-  moves: TidyMoveOp[]
-  duplicateGroups: Map<number, DocumentEntry[]>
-  orphans: DocumentEntry[]
+  groupRenames: GroupRename[]
+  edits: TidyEdit[]
+  moves: DocMove[]
+  renumberings: Renumbering[]
+  warnings: string[]
 }
 
-// ---------------------------------------------------------------------------
-// Prompt interface (injected by CLI, mockable in tests)
-// ---------------------------------------------------------------------------
-
+/** Resolve an ambiguous parent among duplicate candidates. Return null
+ * to leave the ref untouched (a warning is emitted). */
 export type ParentPrompt = (
-  doc: DocumentEntry,
-  candidates: DocumentEntry[],
-) => Promise<DocumentEntry | null>
+  child: DocInfo,
+  candidates: Node[],
+) => Promise<Node | null>
 
 // ---------------------------------------------------------------------------
-// Scan and build full document entries
+// Plan
 // ---------------------------------------------------------------------------
 
-function loadAllDocuments(project: ResolvedProject): DocumentEntry[] {
-  const files = [...scanDocuments(project)]
-  return files.map((file) => {
-    const content = readFileSync(file.path, "utf-8")
-    const { data, bodyRaw, bodyWithoutFM } = parseFrontmatter(content)
-    return {
-      ...file,
-      frontmatter: data,
-      bodyRaw,
-      bodyWithoutFM,
-      parentId: parseFrontmatterId(data.parent),
-    }
-  })
+type Resolution =
+  | { kind: "ok"; node: Node }
+  | { kind: "ambiguous"; id: number; candidates: Node[] }
+  | { kind: "missing"; id: number }
+  | { kind: "malformed" }
+
+type DocState = {
+  doc: DocInfo
+  newId: number
+  /** The node the doc will live under, when known. */
+  parent:
+    | { kind: "node"; node: Node }
+    | { kind: "root" }
+    | { kind: "unresolved" }
 }
-
-// ---------------------------------------------------------------------------
-// Step 1: Detect duplicates
-// ---------------------------------------------------------------------------
-
-function findDuplicates(docs: DocumentEntry[]): Map<number, DocumentEntry[]> {
-  const byId = new Map<number, DocumentEntry[]>()
-  for (const doc of docs) {
-    const group = byId.get(doc.id) ?? []
-    group.push(doc)
-    byId.set(doc.id, group)
-  }
-
-  const duplicates = new Map<number, DocumentEntry[]>()
-  for (const [id, group] of byId) {
-    if (group.length > 1) {
-      // Sort deterministically by absolute path — first keeps the ID
-      group.sort((a, b) => a.path.localeCompare(b.path))
-      duplicates.set(id, group)
-    }
-  }
-  return duplicates
-}
-
-// ---------------------------------------------------------------------------
-// Step 2: Build ID mapping (handle duplicates)
-// ---------------------------------------------------------------------------
-
-function buildIdMapping(
-  docs: DocumentEntry[],
-  duplicates: Map<number, DocumentEntry[]>,
-): Map<string, number> {
-  // Map from absolute path → new ID
-  const pathToNewId = new Map<string, number>()
-
-  // Find current max ID
-  let maxId = 0
-  for (const doc of docs) {
-    if (doc.id > maxId) maxId = doc.id
-  }
-
-  // For each duplicate group, first keeps ID, others get new IDs
-  for (const [_id, group] of duplicates) {
-    for (let i = 1; i < group.length; i++) {
-      maxId++
-      pathToNewId.set(group[i].path, maxId)
-    }
-  }
-
-  return pathToNewId
-}
-
-// ---------------------------------------------------------------------------
-// Step 3: Compute expected paths (relocations)
-// ---------------------------------------------------------------------------
-
-/**
- * Compute expected paths for all documents, processing parents before children
- * so that children resolve against the parent's expected (not current) path.
- *
- * Returns a map from document absolute path → expected absolute path.
- */
-function computeAllExpectedPaths(
-  docs: DocumentEntry[],
-  project: ResolvedProject,
-  docById: Map<number, DocumentEntry>,
-  idRemapping: Map<string, number>,
-  orphanPaths: Set<string>,
-): Map<string, string> {
-  const result = new Map<string, string>()
-
-  // Sort by depth (documents with no parent first, then their children, etc.)
-  const sorted = topoSortByParent(docs, docById)
-
-  for (const doc of sorted) {
-    // Orphans keep their current location — don't relocate them
-    if (orphanPaths.has(doc.path)) {
-      result.set(doc.path, doc.path)
-      continue
-    }
-
-    const doctype = doc.doctype
-    const newId = idRemapping.get(doc.path) ?? doc.id
-
-    // Determine base directory
-    let baseDir: string
-    if (doctype.parent === undefined || doc.parentId === null) {
-      baseDir = project.projectDir
-    } else {
-      const parentDoc = docById.get(doc.parentId)
-      if (parentDoc) {
-        // Use the parent's EXPECTED path to compute self directory
-        const parentExpectedPath = result.get(parentDoc.path) ?? parentDoc.path
-        baseDir = dirname(parentExpectedPath)
-      } else {
-        // Parent not found — keep current location
-        result.set(doc.path, doc.path)
-        continue
-      }
-    }
-
-    // Use title-based slug if available, otherwise keep current slug
-    const title =
-      typeof doc.frontmatter.title === "string" &&
-      doc.frontmatter.title.trim().length > 0
-        ? doc.frontmatter.title
-        : null
-
-    if (title) {
-      result.set(
-        doc.path,
-        computeExpectedPath(project, newId, doc.tag, title, doctype, baseDir),
-      )
-    } else {
-      // No title — fall back to current slug
-      const filename = formatDocumentFilename(
-        newId,
-        doc.tag,
-        doc.slug,
-        project.idPadWidth,
-      )
-      const targetDir =
-        doctype.dir === "." ? baseDir : join(baseDir, doctype.dir)
-      if (doctype.intermediateDir) {
-        const dirName = filename.replace(/\.md$/, "")
-        result.set(doc.path, join(targetDir, dirName, filename))
-      } else {
-        result.set(doc.path, join(targetDir, filename))
-      }
-    }
-  }
-
-  return result
-}
-
-/**
- * Sort documents so that parents come before their children.
- */
-function topoSortByParent(
-  docs: DocumentEntry[],
-  docById: Map<number, DocumentEntry>,
-): DocumentEntry[] {
-  const visited = new Set<string>()
-  const sorted: DocumentEntry[] = []
-  const docByPath = new Map(docs.map((d) => [d.path, d]))
-
-  function visit(doc: DocumentEntry) {
-    if (visited.has(doc.path)) return
-    visited.add(doc.path)
-
-    // Visit parent first
-    if (doc.parentId !== null) {
-      const parent = docById.get(doc.parentId)
-      if (parent && docByPath.has(parent.path)) {
-        visit(parent)
-      }
-    }
-
-    sorted.push(doc)
-  }
-
-  for (const doc of docs) {
-    visit(doc)
-  }
-
-  return sorted
-}
-
-// ---------------------------------------------------------------------------
-// Step 4: Detect orphans
-// ---------------------------------------------------------------------------
-
-function findOrphans(
-  docs: DocumentEntry[],
-  idSet: Set<number>,
-): DocumentEntry[] {
-  return docs.filter((doc) => {
-    // Parent reference points to a non-existent document
-    if (doc.parentId !== null && !idSet.has(doc.parentId)) return true
-    // Doctype requires a parent but none is set
-    if (
-      doc.parentId === null &&
-      doc.doctype.parent !== undefined &&
-      doc.doctype.requireParent
-    )
-      return true
-    return false
-  })
-}
-
-// ---------------------------------------------------------------------------
-// Step 5: Resolve parent references for children of duplicates
-// ---------------------------------------------------------------------------
-
-function resolveParentForChild(
-  child: DocumentEntry,
-  duplicateGroup: DocumentEntry[],
-): DocumentEntry | null {
-  // Try to match by slug hint from the parent ref
-  const parentRefStr = child.frontmatter.parent
-  if (typeof parentRefStr === "string") {
-    const ref = parseParentRef(parentRefStr)
-    if (ref) {
-      const match = duplicateGroup.find(
-        (d) => d.tag === ref.tag && d.slug === ref.slug,
-      )
-      if (match) return match
-    }
-  }
-  return null
-}
-
-// ---------------------------------------------------------------------------
-// Build the tidy plan
-// ---------------------------------------------------------------------------
 
 export async function buildTidyPlan(
   project: ResolvedProject,
   promptForParent?: ParentPrompt,
 ): Promise<TidyPlan> {
-  const docs = loadAllDocuments(project)
-  const duplicates = findDuplicates(docs)
-  const idRemapping = buildIdMapping(docs, duplicates)
+  const scan = scanNodes(project)
+  const docs = scan.docs.map(loadDocInfo)
+  const warnings: string[] = []
 
-  // Build a lookup by ID (using original IDs, first-wins for duplicates)
-  const docById = new Map<number, DocumentEntry>()
-  for (const doc of docs) {
-    if (!docById.has(doc.id)) {
-      docById.set(doc.id, doc)
+  // -- 1. ID collisions ----------------------------------------------------
+  const newIdByPath = new Map<string, number>()
+  const renumberings: Renumbering[] = []
+  {
+    const byId = new Map<number, { docs: DocInfo[]; groups: GroupNode[] }>()
+    for (const doc of docs) {
+      const entry = byId.get(doc.id) ?? { docs: [], groups: [] }
+      entry.docs.push(doc)
+      byId.set(doc.id, entry)
+    }
+    for (const group of scan.groups) {
+      const entry = byId.get(group.id) ?? { docs: [], groups: [] }
+      entry.groups.push(group)
+      byId.set(group.id, entry)
+    }
+
+    let nextId = maxNodeId(scan)
+    for (const id of [...byId.keys()].sort((a, b) => a - b)) {
+      const { docs: dupDocs, groups: dupGroups } = byId.get(id)!
+      const losers = [...dupDocs, ...dupGroups].slice(1)
+      // docs and groups are each path-sorted by the scanner; the first
+      // doc (or first group, when no doc carries the ID) keeps it
+      for (const node of losers) {
+        nextId++
+        newIdByPath.set(node.path, nextId)
+        renumberings.push({ node, newId: nextId })
+      }
     }
   }
 
-  // All known IDs (original)
-  const allIds = new Set(docs.map((d) => d.id))
+  const newIdOf = (node: Node): number => newIdByPath.get(node.path) ?? node.id
 
-  // Detect orphans
-  const orphans = findOrphans(docs, allIds)
+  // -- 2. Group renames ----------------------------------------------------
+  const groupRenames: GroupRename[] = []
+  const newGroupPath = new Map<string, string>()
+  for (const group of scan.groups) {
+    const newId = newIdOf(group)
+    const to = join(
+      dirname(group.path),
+      `${project.formatId(newId)}.${group.slug}`,
+    )
+    newGroupPath.set(group.path, to)
+    if (to !== group.path) {
+      groupRenames.push({ group, newId, from: group.path, to })
+    }
+  }
 
-  // Build edits for children of duplicate IDs
-  const edits: TidyEditOp[] = []
+  // -- 3. Ref resolution ---------------------------------------------------
+  const nodesById = new Map<number, { docs: DocInfo[]; groups: GroupNode[] }>()
+  for (const doc of docs) {
+    const entry = nodesById.get(doc.id) ?? { docs: [], groups: [] }
+    entry.docs.push(doc)
+    nodesById.set(doc.id, entry)
+  }
+  for (const group of scan.groups) {
+    const entry = nodesById.get(group.id) ?? { docs: [], groups: [] }
+    entry.groups.push(group)
+    nodesById.set(group.id, entry)
+  }
 
-  // For each duplicate group, resolve children's parent references
-  for (const [dupId, group] of duplicates) {
-    // Find all children referencing this duplicate ID
-    const children = docs.filter((d) => d.parentId === dupId)
+  function resolveRef(raw: unknown): Resolution {
+    const id = parseRefId(raw)
+    if (id === null) return { kind: "malformed" }
+    const entry = nodesById.get(id)
+    if (!entry || entry.docs.length + entry.groups.length === 0) {
+      return { kind: "missing", id }
+    }
+    const candidates: Node[] = [...entry.docs, ...entry.groups]
+    if (candidates.length === 1) return { kind: "ok", node: candidates[0] }
 
-    for (const child of children) {
-      // Try auto-resolve using slug hint
-      let resolvedParent = resolveParentForChild(child, group)
-
-      // If ambiguous, prompt
-      if (!resolvedParent && promptForParent) {
-        resolvedParent = await promptForParent(child, group)
+    const ref = typeof raw === "string" ? parseNodeRef(raw.trim()) : null
+    if (ref !== null) {
+      let matches = candidates.filter((n) => n.slug === ref.slug)
+      if (matches.length > 1) {
+        // the ref's form breaks the doc/group tie for a shared slug
+        matches = matches.filter((n) => n.kind === ref.kind)
       }
+      if (matches.length === 1) return { kind: "ok", node: matches[0] }
+    }
+    // bare or unmatched hint: a single doc wins over directories
+    if (entry.docs.length === 1) return { kind: "ok", node: entry.docs[0] }
+    return { kind: "ambiguous", id, candidates }
+  }
 
-      if (resolvedParent) {
-        const newParentId =
-          idRemapping.get(resolvedParent.path) ?? resolvedParent.id
-        const newRef = formatParentRef(
-          newParentId,
-          resolvedParent.tag,
-          resolvedParent.slug,
+  const healedSlug = (doc: DocInfo): string => {
+    const title = doc.frontmatter.title
+    if (typeof title === "string" && title.trim() !== "") {
+      const slug = slugify(title)
+      if (slug !== "") return slug
+    }
+    return doc.slug
+  }
+
+  const canonicalRef = (node: Node): string =>
+    node.kind === "doc"
+      ? formatDocRef(
+          newIdOf(node),
+          node.tag,
+          healedSlug(node as DocInfo),
           project.formatId,
         )
-        // Only add edit if the ref actually changes
-        const currentRef = child.frontmatter.parent
-        if (currentRef !== newRef) {
-          edits.push({ path: child.path, newParentRef: newRef })
-        }
-      }
-    }
-  }
+      : formatGroupRef(newIdOf(node), node.slug, project.formatId)
 
-  // Also update parent refs for documents whose parent got a new ID,
-  // or whose parent ref is a bare number instead of a full reference.
+  const groupByDirname = (doc: DocInfo): GroupNode | undefined =>
+    scan.groups.find((g) => g.path === dirname(doc.path))
+
+  // -- 4. Per-doc edits ----------------------------------------------------
+  const edits: TidyEdit[] = []
+  const states = new Map<string, DocState>()
+
   for (const doc of docs) {
-    if (doc.parentId === null) continue
-    // Skip documents already handled above (children of duplicates)
-    if (edits.some((e) => e.path === doc.path)) continue
+    const updates: Record<string, unknown> = {}
+    let parent: DocState["parent"]
 
-    const parent = docById.get(doc.parentId)
-    if (!parent) continue
-
-    const parentNewId = idRemapping.get(parent.path)
-    if (parentNewId !== undefined) {
-      // Parent's ID changed — update the child's parent ref
-      const newRef = formatParentRef(
-        parentNewId,
-        parent.tag,
-        parent.slug,
-        project.formatId,
-      )
-      edits.push({ path: doc.path, newParentRef: newRef })
+    const rawParent = doc.frontmatter.parent
+    if (rawParent === undefined) {
+      const group = groupByDirname(doc)
+      if (group) {
+        // adoption: legitimize the drop-a-file-in-the-dir gesture
+        updates.parent = canonicalRef(group)
+        parent = { kind: "node", node: group }
+      } else {
+        parent = { kind: "root" }
+      }
     } else {
-      // Normalize the parent ref to its canonical form. This expands bare
-      // numerics and rewrites full refs with stale slugs or wrong ID padding
-      // (e.g. "1.feat.foo" → "001.feat.foo").
-      const correctRef = formatParentRef(
-        parent.id,
-        parent.tag,
-        parent.slug,
-        project.formatId,
-      )
-      if (doc.frontmatter.parent !== correctRef) {
-        edits.push({ path: doc.path, newParentRef: correctRef })
+      let res = resolveRef(rawParent)
+      if (res.kind === "ambiguous" && promptForParent) {
+        const choice = await promptForParent(doc, res.candidates)
+        if (choice) res = { kind: "ok", node: choice }
+      }
+      switch (res.kind) {
+        case "ok": {
+          const ref = canonicalRef(res.node)
+          if (ref !== rawParent) updates.parent = ref
+          parent = { kind: "node", node: res.node }
+          break
+        }
+        case "ambiguous":
+          warnings.push(
+            `${doc.path}: ambiguous parent ref ${JSON.stringify(rawParent)} — ` +
+              `${res.candidates.length} nodes share ID ${res.id}; left untouched`,
+          )
+          parent = { kind: "unresolved" }
+          break
+        case "missing":
+          warnings.push(
+            `${doc.path}: parent ref ${JSON.stringify(rawParent)} resolves to ` +
+              `no node (ID ${res.id}); left untouched`,
+          )
+          parent = { kind: "unresolved" }
+          break
+        case "malformed":
+          warnings.push(
+            `${doc.path}: malformed parent ref ${JSON.stringify(rawParent)}; ` +
+              `left untouched`,
+          )
+          parent = { kind: "unresolved" }
+          break
       }
     }
+
+    const rawDepends = doc.frontmatter.depends
+    if (rawDepends !== undefined) {
+      const entries = parseDepends(rawDepends)
+      const rewritten = entries.map((entry) => {
+        if (entry.id === null) {
+          warnings.push(
+            `${doc.path}: malformed depends entry ${JSON.stringify(entry.raw)}; kept as-is`,
+          )
+          return entry.raw
+        }
+        const res = resolveRef(entry.raw)
+        if (res.kind === "ok" && res.node.kind === "doc") {
+          return canonicalRef(res.node)
+        }
+        if (res.kind === "ok") {
+          // a group: warn, never fix
+          warnings.push(
+            `${doc.path}: depends entry ${JSON.stringify(entry.raw)} names a ` +
+              `group; groups cannot be depended on — kept as-is`,
+          )
+        } else if (res.kind === "missing") {
+          warnings.push(
+            `${doc.path}: depends entry ${JSON.stringify(entry.raw)} resolves ` +
+              `to no node (ID ${res.id}); kept as-is`,
+          )
+        } else {
+          warnings.push(
+            `${doc.path}: ambiguous depends entry ${JSON.stringify(entry.raw)}; kept as-is`,
+          )
+        }
+        return entry.raw
+      })
+      const original = Array.isArray(rawDepends) ? rawDepends : [rawDepends]
+      if (JSON.stringify(rewritten) !== JSON.stringify(original)) {
+        updates.depends = rewritten
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      edits.push({ path: doc.path, updates })
+    }
+    states.set(doc.path, { doc, newId: newIdOf(doc), parent })
   }
 
-  // Build mappings and detect relocations
-  const orphanPaths = new Set(orphans.map((o) => o.path))
-  const expectedPaths = computeAllExpectedPaths(
-    docs,
-    project,
-    docById,
-    idRemapping,
-    orphanPaths,
-  )
-  const mappings: TidyMapping[] = []
-  const moves: TidyMoveOp[] = []
+  // -- 5. Expected paths and moves -----------------------------------------
+  const postRenamePath = (doc: DocInfo): string => {
+    const dir = dirname(doc.path)
+    return join(newGroupPath.get(dir) ?? dir, basename(doc.path))
+  }
 
+  const expectedPathMemo = new Map<string, string>()
+  const resolving = new Set<string>()
+
+  function expectedPath(state: DocState): string {
+    const memo = expectedPathMemo.get(state.doc.path)
+    if (memo !== undefined) return memo
+
+    const filename = formatDocFilename(
+      state.newId,
+      state.doc.tag,
+      healedSlug(state.doc),
+      project.formatId,
+    )
+
+    let dir: string
+    if (resolving.has(state.doc.path)) {
+      // parent cycle — stay put
+      dir = dirname(postRenamePath(state.doc))
+    } else {
+      resolving.add(state.doc.path)
+      const parent = state.parent
+      if (parent.kind === "root") {
+        dir = project.rootDir
+      } else if (parent.kind === "unresolved") {
+        dir = dirname(postRenamePath(state.doc))
+      } else if (parent.node.kind === "group") {
+        dir = newGroupPath.get(parent.node.path) ?? parent.node.path
+      } else {
+        const parentState = states.get(parent.node.path)
+        dir = parentState
+          ? dirname(expectedPath(parentState))
+          : dirname(postRenamePath(state.doc))
+      }
+      resolving.delete(state.doc.path)
+    }
+
+    const path = join(dir, filename)
+    expectedPathMemo.set(state.doc.path, path)
+    return path
+  }
+
+  const moves: DocMove[] = []
   for (const doc of docs) {
-    const newId = idRemapping.get(doc.path) ?? doc.id
-    const expectedPath = expectedPaths.get(doc.path) ?? doc.path
-
-    const idChanged = newId !== doc.id
-    const pathChanged = expectedPath !== doc.path
-
-    mappings.push({
-      doc,
-      newId,
-      newPath: expectedPath,
-      idChanged,
-      pathChanged,
-    })
-
-    if (pathChanged) {
-      moves.push({ from: doc.path, to: expectedPath })
+    const state = states.get(doc.path)!
+    const from = postRenamePath(doc)
+    const to = expectedPath(state)
+    if (from !== to) {
+      moves.push({ doc, from, to })
     }
   }
 
-  return { mappings, edits, moves, duplicateGroups: duplicates, orphans }
+  return { groupRenames, edits, moves, renumberings, warnings }
+}
+
+export function isNoopPlan(plan: TidyPlan): boolean {
+  return (
+    plan.groupRenames.length === 0 &&
+    plan.edits.length === 0 &&
+    plan.moves.length === 0
+  )
 }
 
 // ---------------------------------------------------------------------------
-// Apply the plan
+// Apply
 // ---------------------------------------------------------------------------
 
 export function applyTidyPlan(plan: TidyPlan): void {
-  // 1. Edit files first (at their current paths)
   for (const edit of plan.edits) {
-    const content = readFileSync(edit.path, "utf-8")
-    const { data, bodyWithoutFM } = parseFrontmatter(content)
-    data.parent = edit.newParentRef
-    const newContent = prependFrontmatter(data, bodyWithoutFM())
-    writeFileSyncOrAbort(edit.path, newContent)
+    const content = readFileSyncOrThrow(edit.path, "utf-8")
+    writeFileSyncOrThrow(
+      edit.path,
+      setFrontmatterProperties(content, edit.updates),
+    )
   }
 
-  // 2. Collect source directories that may become empty after moves
+  for (const rename of plan.groupRenames) {
+    renameSyncOrThrow(rename.from, rename.to)
+  }
+
   const sourceDirs = new Set<string>()
   for (const move of plan.moves) {
     sourceDirs.add(dirname(move.from))
+    mkdirSyncOrThrow(dirname(move.to), { recursive: true })
+    renameSyncOrThrow(move.from, move.to)
   }
 
-  // 3. Move files: create target directory, rename file
-  for (const move of plan.moves) {
-    mkdirSyncOrAbort(dirname(move.to), { recursive: true })
-    renameSyncOrAbort(move.from, move.to)
-  }
-
-  // 4. Clean up empty source directories (bottom-up by path length)
-  const sortedDirs = [...sourceDirs].sort((a, b) => b.length - a.length)
-  for (const dir of sortedDirs) {
+  // bottom-up: longer paths first
+  for (const dir of [...sourceDirs].sort((a, b) => b.length - a.length)) {
     tryRemoveEmptyDir(dir)
   }
 }
 
-/**
- * Resolve a single orphan: set its parent in frontmatter and relocate it.
- */
-export function resolveOrphan(
-  project: ResolvedProject,
-  orphan: DocumentEntry,
-  parent: DocumentEntry,
-): void {
-  // 1. Write parent ref to frontmatter
-  const parentRef = formatParentRef(
-    parent.id,
-    parent.tag,
-    parent.slug,
-    project.formatId,
-  )
-  const content = readFileSync(orphan.path, "utf-8")
-  const { data, bodyWithoutFM } = parseFrontmatter(content)
-  data.parent = parentRef
-  const newContent = prependFrontmatter(data, bodyWithoutFM())
-  writeFileSyncOrAbort(orphan.path, newContent)
-
-  // 2. Compute expected path and relocate
-  const parentSelfDir = dirname(parent.path)
-  const title = orphan.frontmatter.title
-  const slug =
-    typeof title === "string" && title.trim().length > 0 ? title : orphan.slug
-  const expectedPath = computeExpectedPath(
-    project,
-    orphan.id,
-    orphan.tag,
-    slug,
-    orphan.doctype,
-    parentSelfDir,
-  )
-
-  renameDocument(orphan, expectedPath)
-}
-
 function tryRemoveEmptyDir(dir: string): void {
   try {
-    const entries = readdirSync(dir)
-    if (entries.length === 0) {
-      rmdirSync(dir)
-    }
+    if (readdirSyncOrThrow(dir).length === 0) rmdirSyncOrThrow(dir)
   } catch {
-    // Directory doesn't exist or can't be read — fine
+    // gone or unreadable — fine
   }
 }
+
+// re-exported for the command layer's plan display
+export type { ScanResult }

@@ -28,54 +28,60 @@ vi.mock("../lib/cli.js", async () => {
   }
 })
 
-vi.mock("../lib/project.js", async () => {
-  const actual = (await vi.importActual("../lib/project.js")) as Record<
+vi.mock("../core/config.js", async () => {
+  const actual = (await vi.importActual("../core/config.js")) as Record<
     string,
     unknown
   >
   return { ...actual, loadProjectFrom: vi.fn() }
 })
 
+import { loadProjectFrom } from "../core/config.js"
 import * as cliMod from "../lib/cli.js"
-import { loadProjectFrom } from "../lib/project.js"
 import { listCommand } from "./list.js"
 
 const testProject = createTestProject("list-cmd")
 
-const BASIC_SETUP = {
-  pmJson: {
-    doctypes: {
-      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-      spec: { tag: "spec", dir: ".", parent: "feature" },
-      task: { tag: "task", dir: ".", parent: "spec" },
-    },
+const PM_JSON = {
+  directory: "docs",
+  types: {
+    feature: { tag: "feat" },
+    task: { tag: "task" },
   },
+}
+
+const BASIC_SETUP = {
+  pmJson: PM_JSON,
   files: {
-    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
-      title: "User authentication",
-      status: "new",
-      created_on: "2026-03-20",
-    },
-    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
-      parent: "1.feat.user-auth",
+    "docs/001.feat.auth.md": { title: "User authentication", status: "new" },
+    "docs/002.task.login.md": {
+      parent: "1.feat.auth",
       title: "Login flow",
       status: "new",
-      created_on: "2026-03-20",
     },
-    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
-      parent: "2.spec.login-flow",
+    "docs/003.task.jwt.md": {
+      parent: "1.feat.auth",
       title: "Add JWT middleware",
       status: "done",
-      created_on: "2026-03-21",
     },
-    "context/features/001.feat.user-auth/004.task.session-store.md": {
-      parent: "2.spec.login-flow",
+    "docs/004.task.session.md": {
+      parent: "1.feat.auth",
       title: "Session store",
       status: "new",
-      created_on: "2026-03-21",
+    },
+    "docs/005.task.stuck.md": {
+      parent: "1.feat.auth",
+      title: "Stuck task",
+      status: "blocked",
+    },
+    "docs/006.wild.thing.md": { title: "Wild thing", status: "new" },
+    "docs/010.icebox/011.task.later.md": {
+      parent: "10.icebox",
+      title: "Later task",
+      status: "new",
     },
   },
-} as const
+}
 
 function infoLines(): string[] {
   return vi.mocked(cliMod.info).mock.calls.map(([msg]) => msg)
@@ -99,47 +105,110 @@ describe("list command", () => {
   it("lists active documents by default", () => {
     cli({ name: "pm", commands: [listCommand] }, undefined, ["list"])
     const lines = infoLines()
-    // Doc 3 (jwt-middleware) is done, so should not appear
+    // Doc 3 (jwt) is done and doc 5 (stuck) is blocked, so neither appears
     expect(lines.some((l) => l.includes("User authentication"))).toBe(true)
     expect(lines.some((l) => l.includes("Login flow"))).toBe(true)
     expect(lines.some((l) => l.includes("Session store"))).toBe(true)
     expect(lines.some((l) => l.includes("Add JWT middleware"))).toBe(false)
+    expect(lines.some((l) => l.includes("Stuck task"))).toBe(false)
   })
 
   it("lists done documents with --done", () => {
     cli({ name: "pm", commands: [listCommand] }, undefined, ["list", "--done"])
     const lines = infoLines()
-    // Only doc 3 is done
     expect(lines.some((l) => l.includes("Add JWT middleware"))).toBe(true)
     expect(lines.some((l) => l.includes("Session store"))).toBe(false)
   })
 
-  it("filters by doctype with --type", () => {
+  it("lists blocked documents with --blocked", () => {
+    cli({ name: "pm", commands: [listCommand] }, undefined, [
+      "list",
+      "--blocked",
+    ])
+    const lines = infoLines()
+    expect(lines.some((l) => l.includes("Stuck task"))).toBe(true)
+    expect(lines.some((l) => l.includes("Session store"))).toBe(false)
+  })
+
+  it("lists all documents with --allStatuses", () => {
+    cli({ name: "pm", commands: [listCommand] }, undefined, [
+      "list",
+      "--allStatuses",
+    ])
+    const lines = infoLines()
+    expect(lines.some((l) => l.includes("Add JWT middleware"))).toBe(true)
+    expect(lines.some((l) => l.includes("Stuck task"))).toBe(true)
+    expect(lines.some((l) => l.includes("Session store"))).toBe(true)
+  })
+
+  it("filters by type name with --type", () => {
     cli({ name: "pm", commands: [listCommand] }, undefined, [
       "list",
       "--type",
       "task",
     ])
     const lines = infoLines()
-    // Only active tasks
     expect(lines.some((l) => l.includes("Session store"))).toBe(true)
+    expect(lines.some((l) => l.includes("Login flow"))).toBe(true)
     expect(lines.some((l) => l.includes("User authentication"))).toBe(false)
+  })
+
+  it("filters by tag with --type", () => {
+    cli({ name: "pm", commands: [listCommand] }, undefined, [
+      "list",
+      "--type",
+      "feat",
+    ])
+    const lines = infoLines()
+    expect(lines.some((l) => l.includes("User authentication"))).toBe(true)
     expect(lines.some((l) => l.includes("Login flow"))).toBe(false)
   })
 
-  it("filters by parent with --parent", () => {
+  it("filters by raw undeclared tag with --type", () => {
+    cli({ name: "pm", commands: [listCommand] }, undefined, [
+      "list",
+      "--type",
+      "wild",
+    ])
+    const lines = infoLines()
+    expect(lines.some((l) => l.includes("Wild thing"))).toBe(true)
+    expect(lines.some((l) => l.includes("User authentication"))).toBe(false)
+  })
+
+  it("does not abort on an unknown --type value, just matches nothing", () => {
+    cli({ name: "pm", commands: [listCommand] }, undefined, [
+      "list",
+      "--type",
+      "nonexistent",
+    ])
+    const lines = infoLines()
+    expect(lines).toEqual([])
+  })
+
+  it("filters by parent with a document ID", () => {
     cli({ name: "pm", commands: [listCommand] }, undefined, [
       "list",
       "--parent",
-      "2",
+      "1",
     ])
     const lines = infoLines()
-    // Descendants of spec 002: tasks 003 and 004 (only active)
+    expect(lines.some((l) => l.includes("Login flow"))).toBe(true)
     expect(lines.some((l) => l.includes("Session store"))).toBe(true)
     expect(lines.some((l) => l.includes("User authentication"))).toBe(false)
   })
 
-  it("filters by exact status with --status", () => {
+  it("filters by parent with a group ID", () => {
+    cli({ name: "pm", commands: [listCommand] }, undefined, [
+      "list",
+      "--parent",
+      "10",
+    ])
+    const lines = infoLines()
+    expect(lines.some((l) => l.includes("Later task"))).toBe(true)
+    expect(lines.some((l) => l.includes("User authentication"))).toBe(false)
+  })
+
+  it("filters by exact status with --status, bypassing the active-only default", () => {
     cli({ name: "pm", commands: [listCommand] }, undefined, [
       "list",
       "--status",
@@ -157,16 +226,6 @@ describe("list command", () => {
     expect(featureLine).toContain("(new)")
   })
 
-  it("aborts on unknown doctype", () => {
-    expect(() =>
-      cli({ name: "pm", commands: [listCommand] }, undefined, [
-        "list",
-        "--type",
-        "nonexistent",
-      ]),
-    ).toThrow('Unknown doctype: "nonexistent"')
-  })
-
   it("aborts on invalid parent ID", () => {
     expect(() =>
       cli({ name: "pm", commands: [listCommand] }, undefined, [
@@ -174,14 +233,11 @@ describe("list command", () => {
         "--parent",
         "abc",
       ]),
-    ).toThrow("Invalid parent ID")
+    ).toThrow('Invalid parent ID: "abc"')
   })
 
   it("filters by typed frontmatter with --is", () => {
-    const filePath = join(
-      dir,
-      "context/features/001.feat.user-auth/004.task.session-store.md",
-    )
+    const filePath = join(dir, "docs/004.task.session.md")
     const content = readFileSync(filePath, "utf-8")
     const { data, body } = parseFrontmatter(content)
     writeFileSync(

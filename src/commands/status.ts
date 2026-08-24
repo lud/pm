@@ -1,12 +1,11 @@
 import { command } from "cleye"
 import table from "text-table"
+import { loadProjectFrom, type ResolvedProject } from "../core/config.js"
 import { getCurrentId } from "../core/current.js"
-import { showDocument } from "../core/documents.js"
-import { getStatusSummary, type StatusSummary } from "../core/listing.js"
+import { showNode } from "../core/docs.js"
+import { getStatusSummary, type StatusSummary } from "../core/list.js"
 import * as cli from "../lib/cli.js"
-import type { ResolvedProject } from "../lib/project.js"
-import { loadProjectFrom } from "../lib/project.js"
-import { displayDocumentRelations, formatDocumentHeader } from "./show.js"
+import { displayShowResult } from "./show.js"
 
 function formatStatusMarker(s: {
   status: string
@@ -23,8 +22,7 @@ function formatStatusSummary(summary: StatusSummary[]): string {
 
   const rows = []
   for (const entry of summary) {
-    // blocks.push(`${entry.doctype}:`)
-    rows.push([entry.doctype])
+    rows.push([entry.type])
 
     if (entry.statuses.length > 0) {
       entry.statuses.forEach((s) => {
@@ -43,6 +41,10 @@ function formatStatusSummary(summary: StatusSummary[]): string {
 }
 
 export function runStatusDisplay(project: ResolvedProject): void {
+  for (const warning of project.warnings) {
+    cli.warning(warning)
+  }
+
   const summary = getStatusSummary(project)
 
   if (summary.length === 0) {
@@ -55,11 +57,9 @@ export function runStatusDisplay(project: ResolvedProject): void {
   if (currentId !== null) {
     cli.info("")
     cli.info("Current document:")
-    const result = showDocument(project, currentId)
+    const result = showNode(project, currentId)
     if (result) {
-      const fmtId = project.formatId
-      cli.info(formatDocumentHeader(result.document, process.cwd(), fmtId))
-      displayDocumentRelations(result, fmtId)
+      displayShowResult(project, result, process.cwd())
     } else {
       cli.warning(`Current document ${currentId} not found`)
     }
@@ -71,7 +71,12 @@ export const statusCommand = command(
     name: "status",
   },
   () => {
-    const project = loadProjectFrom(process.cwd())
+    let project: ResolvedProject
+    try {
+      project = loadProjectFrom(process.cwd())
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
     runStatusDisplay(project)
   },
 )

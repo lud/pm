@@ -1,10 +1,10 @@
 import { command } from "cleye"
+import { loadProjectFrom, type ResolvedProject } from "../core/config.js"
 import { touchCurrent } from "../core/current.js"
-import { markBlocked } from "../core/documents.js"
-import { parseDocumentRef } from "../core/scanner.js"
+import { type DocInfo, markBlocked } from "../core/docs.js"
+import { parseRefId } from "../core/refs.js"
 import * as cli from "../lib/cli.js"
 import { formatPath } from "../lib/format.js"
-import { loadProjectFrom } from "../lib/project.js"
 
 export const blockedCommand = command(
   {
@@ -18,30 +18,38 @@ export const blockedCommand = command(
     },
   },
   (argv) => {
-    const project = loadProjectFrom(process.cwd())
-    const id = parseDocumentRef(argv._.id)
+    let project: ResolvedProject
+    try {
+      project = loadProjectFrom(process.cwd())
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
+
+    const id = parseRefId(argv._.id)
     if (id === null) {
       cli.abortError(`Invalid document ID: "${argv._.id}"`)
     }
 
     let blockedBy: number | undefined
     if (argv.flags.by) {
-      blockedBy = parseDocumentRef(argv.flags.by) ?? undefined
+      blockedBy = parseRefId(argv.flags.by) ?? undefined
       if (blockedBy === undefined) {
         cli.abortError(`Invalid document ID: "${argv.flags.by}"`)
       }
     }
 
+    let doc: DocInfo
     try {
-      const doc = markBlocked(project, id, { blockedBy })
-      touchCurrent(project.projectDir)
-      const displayPath = formatPath(doc.path, process.cwd())
-      cli.success(`${displayPath} → ${doc.frontmatter.status}`)
-      if (blockedBy === undefined) {
-        cli.info("Tip: use --by <id> to reference the blocking document")
-      }
+      doc = markBlocked(project, id, { blockedBy })
     } catch (err) {
       cli.abortError((err as Error).message)
+    }
+
+    touchCurrent(project.projectDir)
+    const displayPath = formatPath(doc.path, process.cwd())
+    cli.success(`${displayPath} → ${doc.frontmatter.status}`)
+    if (blockedBy === undefined) {
+      cli.info("Tip: use --by <id> to reference the blocking document")
     }
   },
 )

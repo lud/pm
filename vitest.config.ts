@@ -1,12 +1,12 @@
 import { defineConfig } from "vitest/config"
+import PendingReporter from "./tools/pending-reporter.js"
 
 export default defineConfig({
   test: {
-    silent: false,
-    coverage: {
-      provider: "v8",
-      include: ["src/**/*.ts"],
-      exclude: ["src/main.ts", "src/**/*.test.ts", "src/commands/**/*.ts"],
-    },
+    reporters: ["default", new PendingReporter()],
+    includeTaskLocation: true,
+    // the developer shell may set PMFILE (project-file override, e.g. via
+    // .envrc to run pm on pm itself) — tests always use the default name
+    env: { PMFILE: "" },
   },
 })

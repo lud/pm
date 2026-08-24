@@ -28,49 +28,59 @@ vi.mock("../lib/cli.js", async () => {
   }
 })
 
-vi.mock("../lib/project.js", async () => {
-  const actual = (await vi.importActual("../lib/project.js")) as Record<
+vi.mock("../core/config.js", async () => {
+  const actual = (await vi.importActual("../core/config.js")) as Record<
     string,
     unknown
   >
   return { ...actual, loadProjectFrom: vi.fn() }
 })
 
+import { loadProjectFrom } from "../core/config.js"
 import * as cliMod from "../lib/cli.js"
-import { loadProjectFrom } from "../lib/project.js"
 import { editCommand } from "./edit.js"
 
 const testProject = createTestProject("edit-cmd")
 
-const BASIC_SETUP = {
-  pmJson: {
-    doctypes: {
-      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-      spec: { tag: "spec", dir: ".", parent: "feature" },
-      task: { tag: "task", dir: ".", parent: "spec" },
-    },
+const PM_JSON = {
+  directory: "docs",
+  types: {
+    feature: { tag: "feat" },
+    spec: { tag: "spec" },
+    task: { tag: "task" },
+    bug: { tag: "bug", blockedStatuses: ["stuck"] },
   },
+}
+
+const BASIC_SETUP = {
+  pmJson: PM_JSON,
+  dirs: ["docs/010.backlog"],
   files: {
-    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
+    "docs/001.feat.user-auth.md": {
       title: "User authentication",
       status: "new",
       created_on: "2026-03-20",
     },
-    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
+    "docs/002.spec.login-flow.md": {
       parent: "1.feat.user-auth",
       title: "Login flow",
       status: "new",
       created_on: "2026-03-20",
     },
-    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
+    "docs/003.task.jwt-middleware.md": {
       parent: "2.spec.login-flow",
       title: "Add JWT middleware",
       status: "done",
       created_on: "2026-03-21",
     },
-    "context/features/001.feat.user-auth/004.task.session-store.md": {
+    "docs/004.task.session-store.md": {
       parent: "2.spec.login-flow",
       title: "Session store",
+      status: "new",
+      created_on: "2026-03-21",
+    },
+    "docs/005.bug.flaky-test.md": {
+      title: "Flaky test",
       status: "new",
       created_on: "2026-03-21",
     },
@@ -82,6 +92,11 @@ function setupMutableProject() {
   vi.spyOn(process, "cwd").mockReturnValue(dir)
   vi.mocked(loadProjectFrom).mockReturnValue(project)
   return dir
+}
+
+function readDoc(dir: string, relPath: string) {
+  const content = readFileSync(join(dir, relPath), "utf-8")
+  return parseFrontmatter(content).data
 }
 
 describe("edit command", () => {
@@ -100,11 +115,7 @@ describe("edit command", () => {
       "status:in-progress",
     ])
 
-    const content = readFileSync(
-      join(dir, "context/features/001.feat.user-auth/001.feat.user-auth.md"),
-      "utf-8",
-    )
-    const { data } = parseFrontmatter(content)
+    const data = readDoc(dir, "docs/001.feat.user-auth.md")
     expect(data.status).toBe("in-progress")
     expect(cliMod.success).toHaveBeenCalledWith(
       expect.stringContaining("Updated"),
@@ -123,11 +134,7 @@ describe("edit command", () => {
       "priority:high",
     ])
 
-    const content = readFileSync(
-      join(dir, "context/features/001.feat.user-auth/001.feat.user-auth.md"),
-      "utf-8",
-    )
-    const { data } = parseFrontmatter(content)
+    const data = readDoc(dir, "docs/001.feat.user-auth.md")
     expect(data.status).toBe("active")
     expect(data.priority).toBe("high")
   })
@@ -148,11 +155,7 @@ describe("edit command", () => {
       "weird:123foo",
     ])
 
-    const content = readFileSync(
-      join(dir, "context/features/001.feat.user-auth/001.feat.user-auth.md"),
-      "utf-8",
-    )
-    const { data } = parseFrontmatter(content)
+    const data = readDoc(dir, "docs/001.feat.user-auth.md")
     expect(data.count).toBe(-2)
     expect(data.ratio).toBe(3.14)
     expect(data.ready).toBe(false)
@@ -185,6 +188,19 @@ describe("edit command", () => {
     ).toThrow("Invalid document ID")
   })
 
+  it("aborts on unknown document ID", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [editCommand] }, undefined, [
+        "edit",
+        "999",
+        "--set",
+        "status:done",
+      ]),
+    ).toThrow("Document 999 not found")
+  })
+
   it("aborts on invalid parent ID", () => {
     setupMutableProject()
 
@@ -213,6 +229,95 @@ describe("edit command", () => {
     ).toThrow("Cannot combine --parent with --set parent")
   })
 
+  it("sets parent to a document", () => {
+    const dir = setupMutableProject()
+
+    cli({ name: "pm", commands: [editCommand] }, undefined, [
+      "edit",
+      "4",
+      "--parent",
+      "1",
+    ])
+
+    const data = readDoc(dir, "docs/004.task.session-store.md")
+    expect(data.parent).toBe("001.feat.user-auth")
+  })
+
+  it("sets parent to a group", () => {
+    const dir = setupMutableProject()
+
+    cli({ name: "pm", commands: [editCommand] }, undefined, [
+      "edit",
+      "1",
+      "--parent",
+      "10",
+    ])
+
+    const data = readDoc(dir, "docs/001.feat.user-auth.md")
+    expect(data.parent).toBe("010.backlog")
+  })
+
+  it("changes the type by name and renames the file", () => {
+    const dir = setupMutableProject()
+
+    cli({ name: "pm", commands: [editCommand] }, undefined, [
+      "edit",
+      "3",
+      "--type",
+      "feature",
+    ])
+
+    const data = readDoc(dir, "docs/003.feat.jwt-middleware.md")
+    expect(data.title).toBe("Add JWT middleware")
+    expect(cliMod.info).toHaveBeenCalledWith(expect.stringContaining("Renamed"))
+  })
+
+  it("changes the type by tag and renames the file", () => {
+    const dir = setupMutableProject()
+
+    cli({ name: "pm", commands: [editCommand] }, undefined, [
+      "edit",
+      "4",
+      "--type",
+      "feat",
+    ])
+
+    const data = readDoc(dir, "docs/004.feat.session-store.md")
+    expect(data.title).toBe("Session store")
+    expect(cliMod.info).toHaveBeenCalledWith(expect.stringContaining("Renamed"))
+  })
+
+  it("aborts on unknown --type", () => {
+    setupMutableProject()
+
+    expect(() =>
+      cli({ name: "pm", commands: [editCommand] }, undefined, [
+        "edit",
+        "1",
+        "--type",
+        "bogus",
+      ]),
+    ).toThrow('Unknown type "bogus"')
+  })
+
+  it("combines --type with --update-slug", () => {
+    const dir = setupMutableProject()
+
+    cli({ name: "pm", commands: [editCommand] }, undefined, [
+      "edit",
+      "2",
+      "--type",
+      "task",
+      "--set",
+      "title:Login flow v2",
+      "--update-slug",
+    ])
+
+    const data = readDoc(dir, "docs/002.task.login-flow-v2.md")
+    expect(data.title).toBe("Login flow v2")
+    expect(cliMod.info).toHaveBeenCalledWith(expect.stringContaining("Renamed"))
+  })
+
   it("sets blocked_by with --blocked-by and --set status:blocked", () => {
     const dir = setupMutableProject()
 
@@ -225,16 +330,26 @@ describe("edit command", () => {
       "status:blocked",
     ])
 
-    const content = readFileSync(
-      join(
-        dir,
-        "context/features/001.feat.user-auth/004.task.session-store.md",
-      ),
-      "utf-8",
-    )
-    const { data } = parseFrontmatter(content)
+    const data = readDoc(dir, "docs/004.task.session-store.md")
     expect(data.status).toBe("blocked")
     expect(data.blocked_by).toBe("003.task.jwt-middleware")
+  })
+
+  it("sets blocked_by to a group", () => {
+    const dir = setupMutableProject()
+
+    cli({ name: "pm", commands: [editCommand] }, undefined, [
+      "edit",
+      "4",
+      "--blocked-by",
+      "10",
+      "--set",
+      "status:blocked",
+    ])
+
+    const data = readDoc(dir, "docs/004.task.session-store.md")
+    expect(data.status).toBe("blocked")
+    expect(data.blocked_by).toBe("010.backlog")
   })
 
   it("aborts when --blocked-by is given without --set status", () => {
@@ -250,19 +365,21 @@ describe("edit command", () => {
     ).toThrow("--blocked-by requires --set status")
   })
 
-  it("aborts when --blocked-by status is not a blocked status", () => {
+  it("aborts when --blocked-by status is not a blocked status for the type", () => {
     setupMutableProject()
 
     expect(() =>
       cli({ name: "pm", commands: [editCommand] }, undefined, [
         "edit",
-        "4",
+        "5",
         "--blocked-by",
         "3",
         "--set",
         "status:in-progress",
       ]),
-    ).toThrow(/not a blocked status/)
+    ).toThrow(
+      'Status "in-progress" is not a blocked status for type "bug". Blocked statuses: stuck',
+    )
   })
 
   it("aborts when --blocked-by conflicts with --set blocked_by", () => {
@@ -294,7 +411,7 @@ describe("edit command", () => {
         "--set",
         "status:blocked",
       ]),
-    ).toThrow("Blocking document 999 not found")
+    ).toThrow("Blocking node 999 not found")
   })
 
   it("renames file with --update-slug when title changes", () => {
@@ -308,14 +425,7 @@ describe("edit command", () => {
       "--update-slug",
     ])
 
-    const content = readFileSync(
-      join(
-        dir,
-        "context/features/001.feat.user-auth/002.spec.new-login-flow.md",
-      ),
-      "utf-8",
-    )
-    const { data } = parseFrontmatter(content)
+    const data = readDoc(dir, "docs/002.spec.new-login-flow.md")
     expect(data.title).toBe("New login flow")
     expect(cliMod.success).toHaveBeenCalledWith(
       expect.stringContaining("Updated"),

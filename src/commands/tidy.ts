@@ -1,17 +1,16 @@
-import { readFileSync } from "node:fs"
 import { search } from "@inquirer/prompts"
 import { command } from "cleye"
-import { scanDocuments } from "../core/scanner.js"
+import { loadProjectFrom, type ResolvedProject } from "../core/config.js"
+import type { DocInfo } from "../core/docs.js"
+import type { Node } from "../core/nodes.js"
 import {
   applyTidyPlan,
   buildTidyPlan,
-  type DocumentEntry,
-  resolveOrphan,
+  isNoopPlan,
+  type TidyPlan,
 } from "../core/tidy.js"
 import * as cli from "../lib/cli.js"
 import { formatPath } from "../lib/format.js"
-import { parseFrontmatter } from "../lib/frontmatter.js"
-import { loadProjectFrom } from "../lib/project.js"
 
 export const tidyCommand = command(
   {
@@ -23,167 +22,138 @@ export const tidyCommand = command(
         description: "Apply changes (default is dry-run)",
         default: false,
       },
+      "no-interactive": {
+        type: Boolean,
+        description:
+          "Skip interactive decisions; ambiguities are warned and left untouched",
+        default: false,
+      },
     },
   },
   async (argv) => {
-    const project = loadProjectFrom(process.cwd())
-    const cwd = process.cwd()
+    let project: ResolvedProject
+    try {
+      project = loadProjectFrom(process.cwd())
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
 
-    const plan = await buildTidyPlan(project, promptForParent)
+    for (const warning of project.warnings) {
+      cli.warning(warning)
+    }
 
-    const hasChanges =
-      plan.edits.length > 0 || plan.moves.length > 0 || plan.orphans.length > 0
+    // Interactive disambiguation only when applying; a dry run — or
+    // --no-interactive — reports ambiguities as warnings instead.
+    const interactive = argv.flags.force && !argv.flags["no-interactive"]
+    let plan: TidyPlan
+    try {
+      plan = await buildTidyPlan(
+        project,
+        interactive ? promptForParent : undefined,
+      )
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
 
-    if (!hasChanges) {
+    for (const warning of plan.warnings) {
+      cli.warning(warning)
+    }
+
+    if (isNoopPlan(plan)) {
       cli.success("Everything is tidy.")
       return
     }
 
-    // Report duplicates
-    if (plan.duplicateGroups.size > 0) {
-      cli.warning("Duplicate IDs found:")
-      for (const [id, group] of plan.duplicateGroups) {
-        cli.info(`  ID ${id}:`)
-        for (const doc of group) {
-          cli.info(`    ${formatPath(doc.path, cwd)}`)
-        }
-      }
-      cli.info("")
-    }
-
-    // Report orphans
-    if (plan.orphans.length > 0) {
-      cli.warning(
-        "Orphaned documents (parent required but not set or not found):",
-      )
-      for (const doc of plan.orphans) {
-        const parentRef = doc.frontmatter.parent ?? "(none)"
-        cli.info(`  ${formatPath(doc.path, cwd)} (parent: ${parentRef})`)
-        cli.info(`    → will prompt for parent and relocate when applied`)
-      }
-      cli.info("")
-    }
-
-    // Report edits
-    if (plan.edits.length > 0) {
-      cli.info("Parent reference updates:")
-      for (const edit of plan.edits) {
-        cli.info(
-          `  ${formatPath(edit.path, cwd)} → parent: ${edit.newParentRef}`,
-        )
-      }
-      cli.info("")
-    }
-
-    // Report moves
-    if (plan.moves.length > 0) {
-      cli.info("File relocations:")
-      for (const move of plan.moves) {
-        cli.info(
-          `  ${formatPath(move.from, cwd)} → ${formatPath(move.to, cwd)}`,
-        )
-      }
-      cli.info("")
-    }
+    displayPlan(plan, process.cwd())
 
     if (!argv.flags.force) {
       cli.info("Dry run. Use -f to apply changes.")
       return
     }
 
-    // Apply edits and moves from the plan
-    applyTidyPlan(plan)
-
-    // Resolve orphans interactively
-    if (plan.orphans.length > 0) {
-      // Build candidate list: all documents of the expected parent doctype
-      for (const orphan of plan.orphans) {
-        const expectedParentDoctype = orphan.doctype.parent
-        if (!expectedParentDoctype) continue
-
-        // Re-scan to get current state (previous moves may have changed paths)
-        const freshProject = loadProjectFrom(process.cwd())
-        const candidates = [...scanDocuments(freshProject)]
-          .filter((d) => d.doctype.name === expectedParentDoctype)
-          .map((d) => {
-            const content = readFileSync(d.path, "utf-8")
-            const { data, bodyRaw, bodyWithoutFM } = parseFrontmatter(content)
-            return {
-              ...d,
-              frontmatter: data,
-              bodyRaw,
-              bodyWithoutFM,
-              parentId: null,
-            } as DocumentEntry
-          })
-
-        if (candidates.length === 0) {
-          cli.warning(
-            `No ${expectedParentDoctype} documents found to be parent of ${orphan.slug}. Skipping.`,
-          )
-          continue
-        }
-
-        const selected = await promptForOrphanParent(orphan, candidates)
-        if (selected) {
-          resolveOrphan(freshProject, orphan, selected)
-          cli.success(
-            `  ${formatPath(orphan.path, cwd)} → parent: ${selected.tag} ${selected.id} ${selected.slug}`,
-          )
-        } else {
-          cli.warning(`  Skipped ${orphan.slug}`)
-        }
-      }
+    try {
+      applyTidyPlan(plan)
+    } catch (err) {
+      cli.abortError((err as Error).message)
     }
-
     cli.success("Tidy complete.")
   },
 )
 
-async function promptForOrphanParent(
-  orphan: DocumentEntry,
-  candidates: DocumentEntry[],
-): Promise<DocumentEntry | null> {
-  cli.info("")
-  cli.warning(
-    `Orphan "${orphan.frontmatter.title ?? orphan.slug}" (${orphan.tag} ${orphan.id}) needs a parent.`,
-  )
-  cli.info(`  Path: ${orphan.path}`)
+function displayPlan(plan: TidyPlan, cwd: string): void {
+  if (plan.renumberings.length > 0) {
+    cli.info("ID changes:")
+    for (const r of plan.renumberings) {
+      const label = r.node.kind === "doc" ? r.node.tag : "group"
+      cli.info(`  ${r.node.id} → ${r.newId} (${label} ${r.node.slug})`)
+    }
+    cli.info("")
+  }
 
-  return promptSelectDocument("Select parent document:", candidates)
+  if (plan.groupRenames.length > 0) {
+    cli.info("Directory renames:")
+    for (const rename of plan.groupRenames) {
+      cli.info(
+        `  ${formatPath(rename.from, cwd)} → ${formatPath(rename.to, cwd)}`,
+      )
+    }
+    cli.info("")
+  }
+
+  if (plan.edits.length > 0) {
+    cli.info("Frontmatter updates:")
+    for (const edit of plan.edits) {
+      for (const [key, value] of Object.entries(edit.updates)) {
+        cli.info(
+          `  ${formatPath(edit.path, cwd)} → ${key}: ${formatValue(value)}`,
+        )
+      }
+    }
+    cli.info("")
+  }
+
+  if (plan.moves.length > 0) {
+    cli.info("File moves:")
+    for (const move of plan.moves) {
+      cli.info(`  ${formatPath(move.from, cwd)} → ${formatPath(move.to, cwd)}`)
+    }
+    cli.info("")
+  }
+}
+
+function formatValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(String).join(", ")}]`
+  }
+  return String(value)
 }
 
 async function promptForParent(
-  doc: DocumentEntry,
-  candidates: DocumentEntry[],
-): Promise<DocumentEntry | null> {
+  doc: DocInfo,
+  candidates: Node[],
+): Promise<Node | null> {
   cli.info("")
   cli.warning(
-    `Document "${doc.frontmatter.title ?? doc.slug}" (${doc.tag} ${doc.id}) has ambiguous parent.`,
+    `Document "${doc.frontmatter.title ?? doc.slug}" (${doc.tag} ${doc.id}) has an ambiguous parent.`,
   )
 
-  return promptSelectDocument("Select correct parent:", candidates)
-}
-
-async function promptSelectDocument(
-  message: string,
-  candidates: DocumentEntry[],
-): Promise<DocumentEntry | null> {
   const choices = candidates.map((c) => ({
-    name: `${c.tag} ${c.id} ${c.frontmatter.title ?? c.slug}`,
+    name:
+      c.kind === "doc"
+        ? `${c.tag} ${c.id} ${(c as DocInfo).frontmatter?.title ?? c.slug}`
+        : `group ${c.id} ${c.slug}`,
     value: c.path,
   }))
 
   try {
     const selectedPath = await search({
-      message,
+      message: "Select correct parent:",
       source: (input) => {
         if (!input) return choices
         const lower = input.toLowerCase()
         return choices.filter((c) => c.name.toLowerCase().includes(lower))
       },
     })
-
     return candidates.find((c) => c.path === selectedPath) ?? null
   } catch {
     return null

@@ -1,3 +1,5 @@
+import { writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { cli } from "cleye"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createTestProject } from "../lib/test-setup.js"
@@ -25,82 +27,205 @@ vi.mock("../lib/cli.js", async () => {
   }
 })
 
-vi.mock("../lib/project.js", async () => {
-  const actual = (await vi.importActual("../lib/project.js")) as Record<
-    string,
-    unknown
-  >
-  return { ...actual, loadProjectFrom: vi.fn() }
-})
-
 import * as cliMod from "../lib/cli.js"
-import { loadProjectFrom } from "../lib/project.js"
 import { infoCommand } from "./info.js"
 
 const testProject = createTestProject("info-cmd")
 
-const BASIC_SETUP = {
-  pmJson: {
-    doctypes: {
-      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-      spec: { tag: "spec", dir: ".", parent: "feature" },
-      task: { tag: "task", dir: ".", parent: "spec" },
-    },
-  },
-  files: {
-    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
-      title: "User authentication",
-      status: "new",
-      created_on: "2026-03-20",
-    },
-    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
-      parent: "1.feat.user-auth",
-      title: "Login flow",
-      status: "new",
-      created_on: "2026-03-20",
-    },
-    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
-      parent: "2.spec.login-flow",
-      title: "Add JWT middleware",
-      status: "done",
-      created_on: "2026-03-21",
-    },
-    "context/features/001.feat.user-auth/004.task.session-store.md": {
-      parent: "2.spec.login-flow",
-      title: "Session store",
-      status: "new",
-      created_on: "2026-03-21",
-    },
-  },
-} as const
+function infoLines(): string[] {
+  return vi.mocked(cliMod.info).mock.calls.map(([msg]) => msg)
+}
 
-let dir: string
+function warningLines(): string[] {
+  return vi.mocked(cliMod.warning).mock.calls.map(([msg]) => msg)
+}
+
+function run(): void {
+  cli({ name: "pm", commands: [infoCommand] }, undefined, ["info"])
+}
 
 describe("info command", () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    const setup = testProject.setup(BASIC_SETUP)
-    dir = setup.dir
-    vi.spyOn(process, "cwd").mockReturnValue(dir)
-    vi.mocked(loadProjectFrom).mockReturnValue(setup.project)
-  })
-
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it("outputs the project directory", () => {
-    cli({ name: "pm", commands: [infoCommand] }, undefined, ["info"])
-    expect(cliMod.info).toHaveBeenCalledWith(`Project: ${dir}`)
+  describe("with a full v2 config", () => {
+    let dir: string
+
+    beforeEach(() => {
+      vi.clearAllMocks()
+      const setup = testProject.setup({
+        pmJson: {
+          directory: "docs",
+          defaultStatus: "new",
+          doneStatuses: ["done"],
+          blockedStatuses: ["blocked"],
+          types: {
+            feature: { tag: "feat" },
+            decision: {
+              tag: "adr",
+              doneStatuses: ["accepted", "rejected"],
+            },
+          },
+        },
+        dirs: ["docs"],
+      })
+      dir = setup.dir
+      vi.spyOn(process, "cwd").mockReturnValue(dir)
+    })
+
+    it("prints the project directory", () => {
+      run()
+      expect(infoLines()).toContain(`Project: ${dir}`)
+    })
+
+    it("prints the resolved documents directory", () => {
+      run()
+      expect(infoLines()).toContain(`Directory: docs (${join(dir, "docs")})`)
+    })
+
+    it("lists each type with its effective status configuration", () => {
+      run()
+      const lines = infoLines()
+      expect(lines).toContain("  feature (feat)")
+      expect(lines).toContain("  decision (adr)")
+      const featureIdx = lines.indexOf("  feature (feat)")
+      const decisionIdx = lines.indexOf("  decision (adr)")
+      // effective values, resolved from globals + per-type overrides
+      expect(lines.slice(featureIdx + 1, featureIdx + 4)).toContain(
+        "      default: new  done: done  blocked: blocked",
+      )
+      expect(lines.slice(decisionIdx + 1, decisionIdx + 4)).toContain(
+        "      default: new  done: accepted, rejected  blocked: blocked",
+      )
+    })
+
+    it("prints the fallback statuses for undeclared types", () => {
+      run()
+      expect(infoLines()).toContain(
+        "Undeclared types use: default: new  done: done  blocked: blocked",
+      )
+    })
+
+    it("prints no warnings", () => {
+      run()
+      expect(warningLines()).toEqual([])
+    })
   })
 
-  it("outputs doctype information", () => {
-    cli({ name: "pm", commands: [infoCommand] }, undefined, ["info"])
-    const calls = vi.mocked(cliMod.info).mock.calls.map(([msg]) => msg)
-    // Should contain info about the default doctypes (feature, spec, task)
-    const tableOutput = calls.find(
-      (c) => c.includes("feature") && c.includes("spec"),
+  describe("with no declared types", () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+      const setup = testProject.setup({
+        pmJson: { directory: "docs" },
+        dirs: ["docs"],
+      })
+      vi.spyOn(process, "cwd").mockReturnValue(setup.dir)
+    })
+
+    it("prints Types: (none)", () => {
+      run()
+      expect(infoLines()).toContain("Types: (none)")
+    })
+  })
+
+  describe("with a legacy (doctypes) config", () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+      const setup = testProject.setup({
+        pmJson: {
+          directory: "docs",
+          doctypes: {
+            feature: { tag: "feat", dir: "docs", intermediateDir: true },
+          },
+        },
+        dirs: ["docs"],
+      })
+      vi.spyOn(process, "cwd").mockReturnValue(setup.dir)
+    })
+
+    it("still reports the type resolved from the legacy doctypes field", () => {
+      run()
+      expect(infoLines().some((l) => l.includes("feature (feat)"))).toBe(true)
+    })
+
+    it("prints warnings about the legacy config", () => {
+      run()
+      const warnings = warningLines()
+      expect(warnings.some((w) => w.includes('Legacy "doctypes"'))).toBe(true)
+    })
+  })
+
+  describe("when no project exists", () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+      const emptyDir = testProject.dir()
+      vi.spyOn(process, "cwd").mockReturnValue(emptyDir)
+    })
+
+    it("aborts with an error", () => {
+      expect(() => run()).toThrow(/Could not locate pm\.json/)
+      expect(cliMod.abortError).toHaveBeenCalled()
+    })
+  })
+})
+
+describe("info command — guides", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("shows built-in guide description and path for known type names", () => {
+    vi.clearAllMocks()
+    const setup = testProject.setup({
+      pmJson: { directory: "docs", types: { feature: { tag: "feat" } } },
+      dirs: ["docs"],
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(setup.dir)
+    run()
+    const lines = infoLines()
+    expect(
+      lines.some((l) => /^ {6}guide: .*type-guides\/feature\.md$/.test(l)),
+    ).toBe(true)
+    // the description line sits right above the guide path line
+    const guideIdx = lines.findIndex((l) => l.includes("type-guides/feature"))
+    expect(lines[guideIdx - 1]).toMatch(/^ {6}\S/)
+  })
+
+  it("shows a project-override guide and honours guide: false", () => {
+    vi.clearAllMocks()
+    const setup = testProject.setup({
+      pmJson: {
+        directory: "docs",
+        types: {
+          feature: { tag: "feat", guide: "my-feature-guide.md" },
+          spec: { tag: "spec", guide: false },
+        },
+      },
+      dirs: ["docs"],
+    })
+    writeFileSync(
+      join(setup.dir, "my-feature-guide.md"),
+      "---\ndescription: Custom feature doctrine\n---\n",
     )
-    expect(tableOutput).toBeDefined()
+    vi.spyOn(process, "cwd").mockReturnValue(setup.dir)
+    run()
+    const lines = infoLines()
+    expect(lines).toContain("      Custom feature doctrine")
+    expect(lines).toContain("      guide: my-feature-guide.md")
+    expect(lines.filter((l) => l.includes("guide:"))).toHaveLength(1)
+  })
+
+  it("aborts when an explicit guide path does not resolve", () => {
+    vi.clearAllMocks()
+    const setup = testProject.setup({
+      pmJson: {
+        directory: "docs",
+        types: { feature: { tag: "feat", guide: "gone.md" } },
+      },
+      dirs: ["docs"],
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(setup.dir)
+    expect(() => run()).toThrow(/Guide for type "feature" not found/)
   })
 })

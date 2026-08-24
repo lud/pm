@@ -1,15 +1,24 @@
 import { command } from "cleye"
-import { findDocumentById, parseDocumentRef } from "../core/scanner.js"
+import { loadProjectFrom, type ResolvedProject } from "../core/config.js"
+import { findNodeById, type ScanResult, scanNodes } from "../core/nodes.js"
+import { parseRefId } from "../core/refs.js"
 import * as cli from "../lib/cli.js"
 import { formatPath } from "../lib/format.js"
-import { loadProjectFrom } from "../lib/project.js"
 
 export const whichCommand = command(
   {
     name: "which",
   },
   (argv) => {
-    const project = loadProjectFrom(process.cwd())
+    const cwd = process.cwd()
+
+    let project: ResolvedProject
+    try {
+      project = loadProjectFrom(cwd)
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
+
     const ids = argv._ as string[]
 
     if (ids.length === 0) {
@@ -17,18 +26,25 @@ export const whichCommand = command(
       return
     }
 
+    let scan: ScanResult
+    try {
+      scan = scanNodes(project)
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
+
     for (const raw of ids) {
-      const id = parseDocumentRef(raw)
+      const id = parseRefId(raw)
       if (id === null) {
         cli.abortError(`Invalid document ID: "${raw}"`)
       }
 
-      const doc = findDocumentById(project, id)
-      if (!doc) {
+      const node = findNodeById(scan, id)
+      if (!node) {
         cli.abortError(`Document ${id} not found`)
       }
 
-      cli.info(formatPath(doc.path, process.cwd()))
+      cli.info(formatPath(node.path, cwd))
     }
   },
 )

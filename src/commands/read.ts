@@ -1,10 +1,16 @@
-import { readFileSync } from "node:fs"
 import { basename } from "node:path"
 import { command } from "cleye"
-import { findDocumentById, parseDocumentRef } from "../core/scanner.js"
+import { loadProjectFrom, type ResolvedProject } from "../core/config.js"
+import {
+  type DocNode,
+  findNodeById,
+  type ScanResult,
+  scanNodes,
+} from "../core/nodes.js"
+import { parseRefId } from "../core/refs.js"
 import * as cli from "../lib/cli.js"
 import { formatContentSeparator } from "../lib/format.js"
-import { loadProjectFrom } from "../lib/project.js"
+import { readFileSyncOrThrow } from "../lib/fs-helpers.js"
 
 export const readCommand = command(
   {
@@ -12,25 +18,50 @@ export const readCommand = command(
     parameters: ["<id...>"],
   },
   (argv) => {
-    const project = loadProjectFrom(process.cwd())
+    let project: ResolvedProject
+    try {
+      project = loadProjectFrom(process.cwd())
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
+
     const raws = argv._.id as string[]
 
-    // Resolve every ID up front so a bad/missing ID aborts before any output.
-    const docs = raws.map((raw) => {
-      const id = parseDocumentRef(raw)
+    let scan: ScanResult
+    try {
+      scan = scanNodes(project)
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
+
+    // Resolve every ID up front so a bad/missing/group ID aborts before any output.
+    const docs: DocNode[] = raws.map((raw) => {
+      const id = parseRefId(raw)
       if (id === null) {
         cli.abortError(`Invalid document ID: "${raw}"`)
       }
-      const doc = findDocumentById(project, id)
-      if (!doc) {
+
+      const node = findNodeById(scan, id)
+      if (!node) {
         cli.abortError(`Document ${id} not found`)
       }
-      return doc
+
+      if (node.kind === "group") {
+        cli.abortError(`Node ${id} is a group directory, not a document`)
+      }
+
+      return node
     })
 
     const withHeaders = docs.length > 1
     docs.forEach((doc, index) => {
-      const content = readFileSync(doc.path, "utf-8")
+      let content: string
+      try {
+        content = readFileSyncOrThrow(doc.path, "utf-8")
+      } catch (err) {
+        cli.abortError((err as Error).message)
+      }
+
       if (withHeaders) {
         if (index > 0) cli.info("")
         cli.info(formatContentSeparator(basename(doc.path)))

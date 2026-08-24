@@ -25,47 +25,50 @@ vi.mock("../lib/cli.js", async () => {
   }
 })
 
-vi.mock("../lib/project.js", async () => {
-  const actual = (await vi.importActual("../lib/project.js")) as Record<
+vi.mock("../core/config.js", async () => {
+  const actual = (await vi.importActual("../core/config.js")) as Record<
     string,
     unknown
   >
   return { ...actual, loadProjectFrom: vi.fn() }
 })
 
+import { loadProjectFrom } from "../core/config.js"
 import * as cliMod from "../lib/cli.js"
-import { loadProjectFrom } from "../lib/project.js"
 import { whichCommand } from "./which.js"
 
 const testProject = createTestProject("which-cmd")
 
-const BASIC_SETUP = {
-  pmJson: {
-    doctypes: {
-      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-      spec: { tag: "spec", dir: ".", parent: "feature" },
-      task: { tag: "task", dir: ".", parent: "spec" },
-    },
+const PM_JSON = {
+  directory: "docs",
+  types: {
+    feature: { tag: "feat" },
+    spec: { tag: "spec" },
+    task: { tag: "task" },
   },
+}
+
+const BASIC_SETUP = {
+  pmJson: PM_JSON,
   files: {
-    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
+    "docs/001.feat.user-auth.md": {
       title: "User authentication",
       status: "new",
       created_on: "2026-03-20",
     },
-    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
+    "docs/002.spec.login-flow.md": {
       parent: "1.feat.user-auth",
       title: "Login flow",
       status: "new",
       created_on: "2026-03-20",
     },
-    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
+    "docs/003.task.jwt-middleware.md": {
       parent: "2.spec.login-flow",
       title: "Add JWT middleware",
       status: "done",
       created_on: "2026-03-21",
     },
-    "context/features/001.feat.user-auth/004.task.session-store.md": {
+    "docs/004.task.session-store.md": {
       parent: "2.spec.login-flow",
       title: "Session store",
       status: "new",
@@ -96,16 +99,12 @@ describe("which command", () => {
 
   it("outputs the path of a document by ID", () => {
     cli({ name: "pm", commands: [whichCommand] }, undefined, ["which", "1"])
-    expect(cliMod.info).toHaveBeenCalledWith(
-      "context/features/001.feat.user-auth/001.feat.user-auth.md",
-    )
+    expect(cliMod.info).toHaveBeenCalledWith("docs/001.feat.user-auth.md")
   })
 
   it("accepts zero-padded IDs", () => {
     cli({ name: "pm", commands: [whichCommand] }, undefined, ["which", "002"])
-    expect(cliMod.info).toHaveBeenCalledWith(
-      "context/features/001.feat.user-auth/002.spec.login-flow.md",
-    )
+    expect(cliMod.info).toHaveBeenCalledWith("docs/002.spec.login-flow.md")
   })
 
   it("outputs multiple document paths", () => {
@@ -115,13 +114,10 @@ describe("which command", () => {
       "3",
     ])
     expect(cliMod.info).toHaveBeenCalledTimes(2)
-    expect(cliMod.info).toHaveBeenNthCalledWith(
-      1,
-      "context/features/001.feat.user-auth/001.feat.user-auth.md",
-    )
+    expect(cliMod.info).toHaveBeenNthCalledWith(1, "docs/001.feat.user-auth.md")
     expect(cliMod.info).toHaveBeenNthCalledWith(
       2,
-      "context/features/001.feat.user-auth/003.task.jwt-middleware.md",
+      "docs/003.task.jwt-middleware.md",
     )
   })
 
@@ -148,5 +144,17 @@ describe("which command", () => {
     }).toThrow("Document 999 not found")
     // Only the first document's path was output before the error
     expect(cliMod.info).toHaveBeenCalledTimes(1)
+  })
+
+  it("resolves a group ID to its directory path", () => {
+    const setup = testProject.setup({
+      pmJson: PM_JSON,
+      dirs: ["docs/010.backlog"],
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(setup.dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(setup.project)
+
+    cli({ name: "pm", commands: [whichCommand] }, undefined, ["which", "10"])
+    expect(cliMod.info).toHaveBeenCalledWith("docs/010.backlog")
   })
 })

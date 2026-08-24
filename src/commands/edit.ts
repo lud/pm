@@ -1,11 +1,16 @@
 import { command } from "cleye"
+import {
+  findType,
+  loadProjectFrom,
+  type ResolvedProject,
+} from "../core/config.js"
 import { touchCurrent } from "../core/current.js"
-import { editDocument, readDocument } from "../core/documents.js"
-import { formatParentRef } from "../core/parent-ref.js"
-import { parseDocumentRef } from "../core/scanner.js"
+import { editDocument, readDocument } from "../core/docs.js"
+import { statusConfigFor } from "../core/list.js"
+import { findNodeById, type ScanResult, scanNodes } from "../core/nodes.js"
+import { formatDocRef, formatGroupRef, parseRefId } from "../core/refs.js"
 import * as cli from "../lib/cli.js"
 import { formatPath } from "../lib/format.js"
-import { loadProjectFrom } from "../lib/project.js"
 import {
   flagsToRecord,
   type PropertyFlag,
@@ -20,12 +25,16 @@ export const editCommand = command(
       parent: {
         type: String,
         alias: "p",
-        description: "Set parent document ID",
+        description: "Set parent document or group ID",
+      },
+      type: {
+        type: String,
+        description: "Change the document type (name or tag)",
       },
       "blocked-by": {
         type: String,
         description:
-          "Set blocking document ID (requires --set status:<blocked-status>)",
+          "Set blocking document or group ID (requires --set status:<blocked-status>)",
       },
       set: {
         type: [String],
@@ -39,8 +48,14 @@ export const editCommand = command(
     },
   },
   (argv) => {
-    const project = loadProjectFrom(process.cwd())
-    const id = parseDocumentRef(argv._.id)
+    let project: ResolvedProject
+    try {
+      project = loadProjectFrom(process.cwd())
+    } catch (err) {
+      cli.abortError((err as Error).message)
+    }
+
+    const id = parseRefId(argv._.id)
     if (id === null) {
       cli.abortError(`Invalid document ID: "${argv._.id}"`)
     }
@@ -57,7 +72,7 @@ export const editCommand = command(
 
     let setParent: number | undefined
     if (argv.flags.parent) {
-      setParent = parseDocumentRef(argv.flags.parent) ?? undefined
+      setParent = parseRefId(argv.flags.parent) ?? undefined
       if (setParent === undefined) {
         cli.abortError(`Invalid parent ID: "${argv.flags.parent}"`)
       }
@@ -79,8 +94,7 @@ export const editCommand = command(
         )
       }
 
-      const blockedById =
-        parseDocumentRef(argv.flags["blocked-by"]) ?? undefined
+      const blockedById = parseRefId(argv.flags["blocked-by"]) ?? undefined
       if (blockedById === undefined) {
         cli.abortError(`Invalid document ID: "${argv.flags["blocked-by"]}"`)
       }
@@ -98,28 +112,41 @@ export const editCommand = command(
         )
       }
 
-      if (!doc.doctype.blockedStatuses.includes(String(statusValue))) {
+      const typeLabel = findType(project, doc.tag)?.name ?? doc.tag
+      const { blockedStatuses } = statusConfigFor(project, doc.tag)
+      if (!blockedStatuses.includes(String(statusValue))) {
         cli.abortError(
-          `Status "${statusValue}" is not a blocked status for doctype "${doc.doctype.name}". Blocked statuses: ${doc.doctype.blockedStatuses.join(", ")}`,
+          `Status "${statusValue}" is not a blocked status for type "${typeLabel}". Blocked statuses: ${blockedStatuses.join(", ")}`,
         )
       }
 
-      // Resolve the blocking document to a ref string
-      const blockerDoc = readDocument(project, blockedById)
-      if (!blockerDoc) {
-        cli.abortError(`Blocking document ${blockedById} not found`)
+      // Resolve the blocking node (doc or group) to a qualified ref
+      let scan: ScanResult
+      try {
+        scan = scanNodes(project)
+      } catch (err) {
+        cli.abortError((err as Error).message)
+        return
       }
-      properties.blocked_by = formatParentRef(
-        blockerDoc.id,
-        blockerDoc.tag,
-        blockerDoc.slug,
-        project.formatId,
-      )
+      const blockerNode = findNodeById(scan, blockedById)
+      if (!blockerNode) {
+        cli.abortError(`Blocking node ${blockedById} not found`)
+      }
+      properties.blocked_by =
+        blockerNode.kind === "group"
+          ? formatGroupRef(blockerNode.id, blockerNode.slug, project.formatId)
+          : formatDocRef(
+              blockerNode.id,
+              blockerNode.tag,
+              blockerNode.slug,
+              project.formatId,
+            )
     }
 
     try {
       const { document: doc, renamed } = editDocument(project, id, {
         setParent,
+        setType: argv.flags.type,
         setProperties:
           Object.keys(properties).length > 0 ? properties : undefined,
         updateSlug: argv.flags["update-slug"],

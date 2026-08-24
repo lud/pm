@@ -5,13 +5,37 @@
     "$schema": {
       "type": "string"
     },
+    "directory": {
+      "type": "string"
+    },
     "idMask": {
       "default": "000",
       "type": "string",
       "pattern": "^0{1,10}$"
     },
-    "doctypes": {
-      "default": {},
+    "defaultStatus": {
+      "default": "new",
+      "type": "string"
+    },
+    "doneStatuses": {
+      "default": [
+        "done"
+      ],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blockedStatuses": {
+      "default": [
+        "blocked"
+      ],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "types": {
       "type": "object",
       "propertyNames": {
         "type": "string"
@@ -20,53 +44,45 @@
         "type": "object",
         "properties": {
           "tag": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+          },
+          "defaultStatus": {
             "type": "string"
-          },
-          "dir": {
-            "type": "string"
-          },
-          "parent": {
-            "type": "string"
-          },
-          "requireParent": {
-            "default": true,
-            "type": "boolean"
-          },
-          "intermediateDir": {
-            "default": false,
-            "type": "boolean"
           },
           "doneStatuses": {
-            "default": [
-              "done"
-            ],
             "type": "array",
             "items": {
               "type": "string"
             }
           },
           "blockedStatuses": {
-            "default": [
-              "blocked"
-            ],
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "defaultStatus": {
-            "default": "new",
-            "type": "string"
-          },
-          "workflows": {
-            "default": true,
-            "type": "boolean"
+          "guide": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean",
+                "const": false
+              }
+            ]
           }
         },
         "required": [
           "tag"
-        ]
+        ],
+        "additionalProperties": false
       }
     }
-  }
+  },
+  "required": [
+    "directory"
+  ],
+  "additionalProperties": false
 }

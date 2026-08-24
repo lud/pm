@@ -1,20 +1,11 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
+import { type ResolvedProject, resolveConfig } from "../core/config.js"
 import { formatFrontmatter } from "./frontmatter.js"
-import { type ResolvedProject, resolveProject } from "./project.js"
 import { createTestWorkspace } from "./test-workspace.js"
 
 export type TestFileData = Record<string, unknown> & {
   children?: Record<string, TestFileData>
-}
-
-export type TestSetup = {
-  pmJson: {
-    doctypes: Record<string, unknown>
-    idMask?: string
-  }
-  pmCurrent?: number
-  files: Record<string, TestFileData>
 }
 
 function flattenFiles(
@@ -38,6 +29,20 @@ function flattenFiles(
   }
 }
 
+/** Declarative project setup. */
+export type TestSetup = {
+  pmJson: Record<string, unknown> & {
+    directory: string
+    types?: Record<string, unknown>
+    idMask?: string
+  }
+  pmCurrent?: number
+  /** Extra directories to create (e.g. empty group dirs), relative to the
+   * project dir. Directories containing files need no declaration. */
+  dirs?: string[]
+  files?: Record<string, TestFileData>
+}
+
 export type TestProject = {
   dir: string
   project: ResolvedProject
@@ -46,7 +51,7 @@ export type TestProject = {
 /**
  * Create a test workspace that supports declarative project setup.
  * Each call to `setup()` creates a fresh temporary directory with
- * `.pm.json`, optional `.pm.current`, and all declared files.
+ * `pm.json`, optional `.pm.current`, and all declared files.
  */
 export function createTestProject(label: string) {
   const workspace = createTestWorkspace(label)
@@ -57,31 +62,28 @@ export function createTestProject(label: string) {
     setup(config: TestSetup): TestProject {
       const dir = workspace.dir()
 
-      // Write .pm.json
-      const pmJson = {
-        ...config.pmJson,
-        doctypes: config.pmJson.doctypes,
-      }
-      writeFileSync(join(dir, ".pm.json"), JSON.stringify(pmJson, null, 2))
+      writeFileSync(
+        join(dir, "pm.json"),
+        JSON.stringify(config.pmJson, null, 2),
+      )
 
-      // Write .pm.current
       if (config.pmCurrent != null) {
         writeFileSync(join(dir, ".pm.current"), String(config.pmCurrent))
       }
 
-      // Write document files
+      for (const relDir of config.dirs ?? []) {
+        mkdirSync(join(dir, relDir), { recursive: true })
+      }
+
       const flat: Record<string, Record<string, unknown>> = {}
-      flattenFiles(config.files, undefined, flat)
+      flattenFiles(config.files ?? {}, undefined, flat)
       for (const [relPath, frontmatter] of Object.entries(flat)) {
         const absPath = join(dir, relPath)
         mkdirSync(dirname(absPath), { recursive: true })
         writeFileSync(absPath, formatFrontmatter(frontmatter))
       }
 
-      const project = resolveProject(
-        pmJson as Record<string, unknown>,
-        join(dir, ".pm.json"),
-      )
+      const project = resolveConfig(config.pmJson, join(dir, "pm.json"))
 
       return { dir, project }
     },

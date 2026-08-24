@@ -1,52 +1,37 @@
 import {
   appendFileSync,
   existsSync,
+  mkdirSync,
   readFileSync,
   writeFileSync,
 } from "node:fs"
 import { join, relative } from "node:path"
-import { confirm } from "@inquirer/prompts"
+import { confirm, input } from "@inquirer/prompts"
 import { command } from "cleye"
+import { projectFileName, tryLocateProjectFile } from "../core/config.js"
 import * as cli from "../lib/cli.js"
-import { tryLocateProjectFile } from "../lib/project.js"
 
 const SCHEMA_URL =
   "https://cdn.jsdelivr.net/gh/lud/pm@main/resources/pm-project.schema.json"
 
-const DEFAULT_CONFIG = {
-  $schema: SCHEMA_URL,
-  idMask: "000",
-  doctypes: {
-    feature: {
-      tag: "feat",
-      dir: "context/features",
-      requireParent: true,
-      intermediateDir: true,
-      doneStatuses: ["done"],
-      blockedStatuses: ["blocked"],
-      defaultStatus: "new",
+const DEFAULT_DIRECTORY = "context/pm"
+
+function buildConfig(directory: string) {
+  return {
+    $schema: SCHEMA_URL,
+    directory,
+    types: {
+      feature: { tag: "feat" },
+      spec: { tag: "spec" },
+      task: { tag: "task" },
+      adr: {
+        tag: "adr",
+        defaultStatus: "proposed",
+        doneStatuses: ["accepted", "rejected", "superseded"],
+      },
+      note: { tag: "note", doneStatuses: ["archived"] },
     },
-    spec: {
-      tag: "spec",
-      dir: ".",
-      parent: "feature",
-      requireParent: true,
-      intermediateDir: false,
-      doneStatuses: ["done"],
-      blockedStatuses: ["blocked"],
-      defaultStatus: "new",
-    },
-    task: {
-      tag: "task",
-      dir: ".",
-      parent: "spec",
-      requireParent: true,
-      intermediateDir: false,
-      doneStatuses: ["done"],
-      blockedStatuses: ["blocked"],
-      defaultStatus: "new",
-    },
-  },
+  }
 }
 
 function ensureGitignore(cwd: string): void {
@@ -66,24 +51,30 @@ function ensureGitignore(cwd: string): void {
 export const initCommand = command(
   {
     name: "init",
+    flags: {
+      directory: {
+        type: String,
+        description:
+          "Documents directory — skips all prompts (non-interactive)",
+      },
+    },
   },
-  async () => {
+  async (argv) => {
     const cwd = process.cwd()
-    const configPath = join(cwd, ".pm.json")
+    const fileName = projectFileName()
+    const configPath = join(cwd, fileName)
+    const interactive = argv.flags.directory === undefined
 
     if (existsSync(configPath)) {
-      const proceed = await confirm({
-        message: ".pm.json already exists in this directory. Overwrite?",
-        default: false,
-      })
-      if (!proceed) {
-        cli.info("Aborted")
-        return
-      }
-    } else {
-      const existing = tryLocateProjectFile(cwd)
-      if (existing) {
-        const relPath = relative(cwd, existing)
+      cli.abortError(
+        `Already a pm project: ${fileName} exists in this directory`,
+      )
+    }
+
+    const ancestor = tryLocateProjectFile(cwd)
+    if (ancestor) {
+      const relPath = relative(cwd, ancestor)
+      if (interactive) {
         const proceed = await confirm({
           message: `A project file already exists at ${relPath}. Create a nested project here?`,
           default: false,
@@ -92,11 +83,32 @@ export const initCommand = command(
           cli.info("Aborted")
           return
         }
+      } else {
+        cli.warning(`Creating a nested project (found ${relPath})`)
       }
     }
 
-    writeFileSync(configPath, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`)
-    cli.success("Created .pm.json")
+    let directory: string
+    if (interactive) {
+      directory = await input({
+        message: "Documents directory:",
+        default: DEFAULT_DIRECTORY,
+      })
+      directory = directory.trim()
+      if (directory === "") directory = DEFAULT_DIRECTORY
+    } else {
+      directory = (argv.flags.directory as string).trim()
+      if (directory === "") {
+        cli.abortError("--directory must not be empty")
+      }
+    }
+
+    const config = buildConfig(directory)
+    writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`)
+    cli.success(`Created ${fileName}`)
+
+    mkdirSync(join(cwd, directory), { recursive: true })
+    cli.success(`Created ${directory}/`)
 
     ensureGitignore(cwd)
 

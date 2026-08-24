@@ -1,5 +1,5 @@
 import { join } from "node:path"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createTestProject } from "../lib/test-setup.js"
 
 vi.mock("../lib/cli.js", async () => {
@@ -25,8 +25,8 @@ vi.mock("../lib/cli.js", async () => {
   }
 })
 
-vi.mock("../lib/project.js", async () => {
-  const actual = (await vi.importActual("../lib/project.js")) as Record<
+vi.mock("../core/config.js", async () => {
+  const actual = (await vi.importActual("../core/config.js")) as Record<
     string,
     unknown
   >
@@ -37,51 +37,27 @@ vi.mock("../lib/project.js", async () => {
   }
 })
 
+import { loadProjectFile, tryLocateProjectFile } from "../core/config.js"
 import * as cliMod from "../lib/cli.js"
-import { loadProjectFile, tryLocateProjectFile } from "../lib/project.js"
 import { runDefaultCommand } from "./default.js"
 
 const testProject = createTestProject("default-cmd")
 
-const BASIC_SETUP = {
-  pmJson: {
-    doctypes: {
-      feature: { tag: "feat", dir: "context/features", intermediateDir: true },
-      spec: { tag: "spec", dir: ".", parent: "feature" },
-      task: { tag: "task", dir: ".", parent: "spec" },
-    },
+const PM_JSON = {
+  directory: "docs",
+  types: {
+    feature: { tag: "feat" },
+    task: { tag: "task" },
   },
-  files: {
-    "context/features/001.feat.user-auth/001.feat.user-auth.md": {
-      title: "User authentication",
-      status: "new",
-      created_on: "2026-03-20",
-    },
-    "context/features/001.feat.user-auth/002.spec.login-flow.md": {
-      parent: "1.feat.user-auth",
-      title: "Login flow",
-      status: "new",
-      created_on: "2026-03-20",
-    },
-    "context/features/001.feat.user-auth/003.task.jwt-middleware.md": {
-      parent: "2.spec.login-flow",
-      title: "Add JWT middleware",
-      status: "done",
-      created_on: "2026-03-21",
-    },
-    "context/features/001.feat.user-auth/004.task.session-store.md": {
-      parent: "2.spec.login-flow",
-      title: "Session store",
-      status: "new",
-      created_on: "2026-03-21",
-    },
-  },
-} as const
+}
 
 describe("default command", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   afterEach(() => {
     vi.restoreAllMocks()
-    vi.clearAllMocks()
   })
 
   it("suggests pm init when no project found", () => {
@@ -91,13 +67,24 @@ describe("default command", () => {
     runDefaultCommand()
 
     expect(cliMod.info).toHaveBeenCalledWith(expect.stringContaining("pm init"))
+    expect(loadProjectFile).not.toHaveBeenCalled()
   })
 
-  it("shows status summary when project exists", () => {
-    const { dir, project } = testProject.setup(BASIC_SETUP)
+  it("shows status summary when a project exists", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: PM_JSON,
+      files: {
+        "docs/001.feat.auth.md": { title: "Auth", status: "new" },
+        "docs/002.task.login.md": {
+          parent: "1.feat.auth",
+          title: "Login",
+          status: "new",
+        },
+      },
+    })
     vi.spyOn(process, "cwd").mockReturnValue(dir)
-    const pmJson = join(dir, ".pm.json")
-    vi.mocked(tryLocateProjectFile).mockReturnValue(pmJson)
+    const pmJsonPath = join(dir, "pm.json")
+    vi.mocked(tryLocateProjectFile).mockReturnValue(pmJsonPath)
     vi.mocked(loadProjectFile).mockReturnValue(project)
 
     runDefaultCommand()
@@ -105,6 +92,19 @@ describe("default command", () => {
     const calls = vi.mocked(cliMod.info).mock.calls.map(([msg]) => msg)
     const output = calls.join("\n")
     expect(output).toContain("feature")
+    expect(output).toContain("task")
     expect(output).toContain("new")
+  })
+
+  it("aborts when the project fails to load", () => {
+    vi.spyOn(process, "cwd").mockReturnValue("/some/dir")
+    vi.mocked(tryLocateProjectFile).mockReturnValue("/some/dir/pm.json")
+    vi.mocked(loadProjectFile).mockImplementation(() => {
+      throw new Error("Invalid JSON in /some/dir/pm.json")
+    })
+
+    expect(() => runDefaultCommand()).toThrow(
+      "Invalid JSON in /some/dir/pm.json",
+    )
   })
 })

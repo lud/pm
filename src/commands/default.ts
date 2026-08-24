@@ -1,5 +1,5 @@
+import { loadProjectFile, tryLocateProjectFile } from "../core/config.js"
 import * as cli from "../lib/cli.js"
-import { loadProjectFile, tryLocateProjectFile } from "../lib/project.js"
 import { runStatusDisplay } from "./status.js"
 
 /**
@@ -9,10 +9,14 @@ import { runStatusDisplay } from "./status.js"
 export function runDefaultCommand(): void {
   const projectFile = tryLocateProjectFile(process.cwd())
   if (projectFile === null) {
-    cli.info("No .pm.json found. Run `pm init` to create a project.")
+    cli.info("No pm.json found. Run `pm init` to create a project.")
     return
   }
 
-  const project = loadProjectFile(projectFile)
-  runStatusDisplay(project)
+  try {
+    const project = loadProjectFile(projectFile)
+    runStatusDisplay(project)
+  } catch (err) {
+    cli.abortError((err as Error).message)
+  }
 }
