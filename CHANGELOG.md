@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.0] - 2026-08-27
+
+### 🚀 Features
+
+- Pm tidy will also rewrite IDs in string parent refs
+- [**breaking**] New flat model
+
+### 🐛 Bug Fixes
+
+- Use ID formatter with pm tidy
+
 ## [0.12.0] - 2026-06-02
 
 ### 🚀 Features
