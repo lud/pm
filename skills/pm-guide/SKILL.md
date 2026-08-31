@@ -172,3 +172,10 @@ command never changes the current document.
   `pm tidy --force --no-interactive` — without the flag, ambiguities open an
   interactive prompt meant for humans. With it, ambiguities are warned and
   left untouched for you to resolve with `pm edit`.
+
+## When implementing documents
+
+- **Don't repeat spec content as code comments.** The pm document is the
+  spec — duplicating its requirements, acceptance criteria, or descriptions
+  as comments above the implementing code adds noise and drifts out of sync.
+  Write comments only when the code itself would be unclear without them.
