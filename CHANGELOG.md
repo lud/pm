@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.1] - 2026-09-03
+
+### 💼 Other
+
+- Add implementation rules section
+- Better documentation around reading files and specs writing
+- Reshape the spec.md guide
+
+### ⚙️ Miscellaneous Tasks
+
+- *(pm)* Remember skill install tasks for future README.md
+
 ## [0.13.0] - 2026-08-27
 
 ### 🚀 Features
