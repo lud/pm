@@ -331,6 +331,45 @@ describe("new command — guides", () => {
     expect(guideLines[0]).toMatch(/type-guides\/feature\.md$/)
   })
 
+  it("prints a read-before-write hint after creation", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: { directory: "docs", types: { feature: { tag: "feat" } } },
+      dirs: ["docs"],
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+    cli({ name: "pm", commands: [newCommand] }, undefined, [
+      "new",
+      "feature",
+      "Hinted",
+    ])
+    const lines = vi.mocked(cliMod.info).mock.calls.map(([m]) => String(m))
+    expect(lines).toContain(
+      "Body is empty: read the file with your file tool before writing it.",
+    )
+  })
+
+  it("omits the read-before-write hint when opening an editor", () => {
+    const { dir, project } = testProject.setup({
+      pmJson: { directory: "docs", types: { feature: { tag: "feat" } } },
+      dirs: ["docs"],
+    })
+    vi.spyOn(process, "cwd").mockReturnValue(dir)
+    vi.mocked(loadProjectFrom).mockReturnValue(project)
+    const origEditor = process.env.EDITOR
+    process.env.EDITOR = "true"
+    cli({ name: "pm", commands: [newCommand] }, undefined, [
+      "new",
+      "feature",
+      "Edited",
+      "--editor",
+    ])
+    if (origEditor === undefined) delete process.env.EDITOR
+    else process.env.EDITOR = origEditor
+    const lines = vi.mocked(cliMod.info).mock.calls.map(([m]) => String(m))
+    expect(lines.some((m) => m.startsWith("Body is empty"))).toBe(false)
+  })
+
   it("prints no guide line for a type without one", () => {
     const { dir, project } = testProject.setup({
       pmJson: { directory: "docs", types: { widget: { tag: "wid" } } },

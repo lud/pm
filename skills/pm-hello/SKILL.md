@@ -67,5 +67,7 @@ description (from `pm info`) fits the work, read its guide, and propose the
 creation to the user. Parents are optional: attach the document under a
 related node when one exists, create it top-level otherwise.
 
-In all creation cases, set the new document as current with `pm current <id>`
-and continue.
+In all creation cases, read the created file with your file read tool and
+write its body following the guide (never leave it empty). Set it as current
+with `pm current <id>` only when the user is starting that work now — documents
+prepared for later stay uncurrent.

@@ -107,6 +107,12 @@ export const newCommand = command(
         cli.info(`Guide: ${formatPath(guide.path, process.cwd())}`)
       }
 
+      if (!argv.flags.editor) {
+        cli.info(
+          "Body is empty: read the file with your file tool before writing it.",
+        )
+      }
+
       if (argv.flags.editor) {
         const editor = process.env.PM_EDITOR ?? process.env.EDITOR
         if (editor) {

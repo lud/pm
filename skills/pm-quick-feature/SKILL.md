@@ -65,7 +65,8 @@ pm new feature <Title> --status idea
 
 Use the status `idea` to distinguish these from actively planned features.
 
-Then open the created file and write the structured content using this template:
+Then read the created file with your file read tool (harnesses require a read
+before an edit) and write the structured content using this template:
 
 ```markdown
 ## Idea

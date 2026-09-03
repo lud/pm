@@ -126,12 +126,25 @@ pm tidy [--force] [--no-interactive]  # Heal IDs, refs, locations (dry-run by de
 pm init [--directory <d>]  # Create pm.json (flag skips prompts)
 ```
 
-## Reading documents: agents use file tools
+## Reading and editing documents: agents use file tools
 
-To read a document as an agent, resolve its path with `pm which <id>` (or take
-it from `pm show`/`pm new` output) and read the file with your native file
-tools — you must read the file anyway before you can edit it. `pm read` exists
-for humans and quick terminal inspection.
+Resolve a document's path with `pm which <id>` (or take it from `pm show` /
+`pm new` output) and read it with your file read tool. `pm read` exists for
+humans and quick terminal inspection.
+
+**Always read a file with your file read tool before editing it**, even one
+you just created: Claude Code rejects edits to files the model has not read
+with `Read` (a plain `cat` or `sed -n` on the single file, without pipes, also
+counts). OpenCode asks the same of its `read` tool. Other harnesses (pi,
+Gemini CLI, Codex) have no such rule; reading first still avoids blind edits.
+
+## After `pm new`
+
+The file holds frontmatter only; the body is empty. Read the type's guide if
+you have not yet, read the file, then write the body. **Never leave a document
+empty**: at least one sentence of intent, done condition, or origin. If there
+is nothing to say beyond the title, the item belonged on a checklist in an
+existing document. Type guides may set a higher bar.
 
 ## Typical workflow
 
@@ -158,6 +171,7 @@ command never changes the current document.
 ## Tips for agents
 
 - `pm new` needs no quotes around the title — trailing words are joined.
+  Right after creation, read the file and write its body (see above).
 - Always pass `--parent` when the work belongs under an existing document or
   group; parentless documents are top-level by design, not by accident.
 - To change a document's type: `pm edit <id> --type <t>` (renames the file's
