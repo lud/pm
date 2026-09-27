@@ -19,7 +19,7 @@
   "scripts": {
     "dev": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc && node tools/add-shebang.cjs dist/main.js",
+    "build": "rm -rf dist && tsc && node tools/add-shebang.cjs dist/main.js",
     "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest"
