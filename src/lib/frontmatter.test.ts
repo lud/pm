@@ -43,6 +43,15 @@ describe("parseFrontmatter", () => {
     expect(result.data.id).toBe(5)
     expect(result.data.parent).toBe(2)
   })
+
+  it("throws when the frontmatter is not a YAML mapping", () => {
+    expect(() => parseFrontmatter("---\njust a string\n---\n")).toThrow(
+      /not a YAML mapping/,
+    )
+    expect(() => parseFrontmatter("---\n- a\n- b\n---\n")).toThrow(
+      /not a YAML mapping/,
+    )
+  })
 })
 
 describe("hasFrontmatter", () => {

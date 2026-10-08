@@ -35,6 +35,10 @@ function editFor(plan: TidyPlan, path: string) {
   return plan.edits.find((e) => e.path === path)
 }
 
+function appendBody(path: string, body = "Body.\n") {
+  writeFileSync(path, `${readFileSync(path, "utf-8")}\n${body}`)
+}
+
 // ---------------------------------------------------------------------------
 // Legacy conversion
 // ---------------------------------------------------------------------------
@@ -335,6 +339,8 @@ describe("depends rewriting", () => {
         },
       },
     })
+    appendBody(join(dir, "docs/001.task.dep.md"))
+    appendBody(join(dir, "docs/002.task.main.md"))
     const plan = await buildTidyPlan(project)
     const edit = editFor(plan, join(dir, "docs/002.task.main.md"))
     expect(edit?.updates.depends).toEqual([
@@ -456,7 +462,7 @@ describe("adoption and placement", () => {
   })
 
   it("is a no-op on a clean v2 project", async () => {
-    const { project } = testProject.setup({
+    const { project, dir } = testProject.setup({
       pmJson: PM_JSON,
       files: {
         "docs/010.stuff/002.feat.auth.md": {
@@ -472,9 +478,65 @@ describe("adoption and placement", () => {
         "docs/004.task.free.md": { title: "Free", status: "new" },
       },
     })
+    for (const rel of [
+      "docs/010.stuff/002.feat.auth.md",
+      "docs/010.stuff/003.task.login.md",
+      "docs/004.task.free.md",
+    ]) {
+      appendBody(join(dir, rel))
+    }
     const plan = await buildTidyPlan(project)
     expect(isNoopPlan(plan)).toBe(true)
     expect(plan.warnings).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Document content checks
+// ---------------------------------------------------------------------------
+
+describe("document content", () => {
+  it("warns about documents with an empty body without changing the plan", async () => {
+    const { project, dir } = testProject.setup({
+      pmJson: PM_JSON,
+      files: {
+        "docs/001.task.empty.md": { title: "Empty", status: "new" },
+        "docs/002.task.blank.md": { title: "Blank", status: "new" },
+        "docs/003.task.full.md": { title: "Full", status: "new" },
+      },
+    })
+    appendBody(join(dir, "docs/002.task.blank.md"), "  \n\n\t\n")
+    appendBody(join(dir, "docs/003.task.full.md"))
+
+    const plan = await buildTidyPlan(project)
+    expect(isNoopPlan(plan)).toBe(true)
+    expect(plan.warnings).toEqual([
+      `${join(dir, "docs/001.task.empty.md")}: body is empty`,
+      `${join(dir, "docs/002.task.blank.md")}: body is empty`,
+    ])
+  })
+
+  it("refuses to plan when any frontmatter cannot be parsed, naming every bad file", async () => {
+    const { project, dir } = testProject.setup({
+      pmJson: PM_JSON,
+      files: {
+        "docs/001.task.ok.md": { title: "Ok", status: "new" },
+      },
+    })
+    const broken = join(dir, "docs/002.task.broken.md")
+    const scalar = join(dir, "docs/003.task.scalar.md")
+    writeFileSync(broken, "---\ntitle: [unclosed\n---\nBody.\n")
+    writeFileSync(scalar, "---\njust a string\n---\nBody.\n")
+
+    const error = await buildTidyPlan(project).then(
+      () => null,
+      (err: Error) => err,
+    )
+    expect(error?.message).toMatch(/2 documents/)
+    expect(error?.message).toContain(`${broken}: `)
+    expect(error?.message).toContain(
+      `${scalar}: frontmatter is not a YAML mapping`,
+    )
   })
 })
 

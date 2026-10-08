@@ -9,7 +9,7 @@ import {
   writeFileSyncOrThrow,
 } from "../lib/fs-helpers.js"
 import type { ResolvedProject } from "./config.js"
-import { type DocInfo, loadDocInfo, slugify } from "./docs.js"
+import { type Doc, type DocInfo, loadDoc, slugify } from "./docs.js"
 import {
   type DocNode,
   formatDocFilename,
@@ -130,8 +130,14 @@ export async function buildTidyPlan(
   promptForParent?: ParentPrompt,
 ): Promise<TidyPlan> {
   const scan = scanNodes(project)
-  const docs = scan.docs.map(loadDocInfo)
+  const docs = loadAllDocs(scan.docs)
   const warnings: string[] = []
+
+  for (const doc of docs) {
+    if (doc.bodyWithoutFM().trim() === "") {
+      warnings.push(`${doc.path}: body is empty`)
+    }
+  }
 
   // -- 1. ID collisions ----------------------------------------------------
   const newIdByPath = new Map<string, number>()
@@ -396,6 +402,32 @@ export async function buildTidyPlan(
   }
 
   return { groupRenames, edits, moves, renumberings, warnings }
+}
+
+function loadAllDocs(nodes: DocNode[]): Doc[] {
+  const docs: Doc[] = []
+  const failures: string[] = []
+  for (const node of nodes) {
+    try {
+      docs.push(loadDoc(node))
+    } catch (err) {
+      const reason = (err as Error).message.split("\n")[0]
+      failures.push(`  ${node.path}: ${reason}`)
+    }
+  }
+  if (failures.length > 0) {
+    const count =
+      failures.length === 1 ? "1 document" : `${failures.length} documents`
+    throw new Error(
+      [
+        `Cannot tidy: ${count} could not be read. Their parent and depends ` +
+          `refs are unknown, so tidying the others is unsafe. Fix them and ` +
+          `run again:`,
+        ...failures,
+      ].join("\n"),
+    )
+  }
+  return docs
 }
 
 export function isNoopPlan(plan: TidyPlan): boolean {

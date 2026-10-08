@@ -149,7 +149,8 @@ you have not yet, read the file, then write the body. Usually that happens
 right after creation; when you create several documents at once (e.g. the user
 lists several tasks), create them all first, then fill them one by one.
 **No document stays empty at the end of the session**: each needs at least one
-sentence of intent, done condition, or origin. If there is nothing to say
+sentence of intent, done condition, or origin. `pm tidy` (dry run) warns about
+every document whose body is still empty. If there is nothing to say
 beyond the title, the item belonged on a checklist in an existing document.
 Type guides may set a higher bar.
 

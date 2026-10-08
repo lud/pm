@@ -12,7 +12,11 @@ export function parseFrontmatter(content: string): {
   const match = FM_REGEX.exec(content)
   if (!match)
     return { data: {}, bodyRaw: content, bodyWithoutFM: () => content }
-  const data = (yaml.parse(match[1]) as Record<string, unknown>) ?? {}
+  const parsed: unknown = yaml.parse(match[1]) ?? {}
+  if (typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("frontmatter is not a YAML mapping")
+  }
+  const data = parsed as Record<string, unknown>
 
   // Normalize well-known fields so consumers don't need runtime type guards
   if ("status" in data && typeof data.status !== "string") {

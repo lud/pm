@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs"
+import { existsSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { cli } from "cleye"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -149,6 +149,22 @@ describe("tidy command", () => {
     expect(warnings).toMatch(/ambiguous parent ref/)
     // the duplicate was still renumbered; only the ambiguous ref was left
     expect(existsSync(join(dir, "docs/003.feat.beta.md"))).toBe(true)
+  })
+
+  it("aborts before planning when a document's frontmatter cannot be parsed", async () => {
+    setup({
+      pmJson: PM_JSON,
+      files: {
+        "docs/001.feat.core/001.feat.core.md": { title: "Core", status: "new" },
+      },
+    })
+    writeFileSync(join(dir, "docs/002.task.broken.md"), "---\ntitle: [x\n---\n")
+
+    await expect(run("--force")).rejects.toThrow(/002\.task\.broken\.md/)
+    expect(cliMod.success).not.toHaveBeenCalled()
+    expect(existsSync(join(dir, "docs/001.feat.core/001.feat.core.md"))).toBe(
+      true,
+    )
   })
 
   it("prints config and plan warnings on a dry run instead of prompting", async () => {
