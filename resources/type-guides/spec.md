@@ -14,6 +14,13 @@ Reference it and spend the spec on design and implementation choices. A standalo
 may open with a short statement of the requirement, then move on to the design. Either
 way, the bulk of the document is how it is built.
 
+## The user makes the calls
+
+A spec records decisions. When writing one, a choice the user has not made is a proposal:
+bring it to them with your reasoning and a recommendation, and write it into the design
+only once they agree. Points still open go under **Open questions** until they are
+settled.
+
 ## The right altitude
 
 Describe behavior, contracts, and constraints: the things a reader cannot recover from the

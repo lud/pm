@@ -46,10 +46,14 @@ document's type never moves it. The project's types are declared in `pm.json`.
 configuration, a one-line description, and the path of its **guide** — a
 document explaining how that type is meant to be used and structured.
 
-**Read the guide before creating or substantially editing a document of a
-type you have not worked with in this session.** `pm new` also prints the
-guide path after each creation. The guide is the authority on that type's
-content doctrine; this skill only covers the mechanics shared by all types.
+**Read the type's guide before any interaction with a document of that
+type**: creating it, writing or editing its body, implementing it, discussing
+its content, marking it done. This is mandatory, with no exception for small
+edits or for types that seem familiar. Skip the read only when the guide's
+content is still in your context from earlier in the session; after the
+conversation was summarized, read it again. `pm new` also prints the guide
+path after each creation. The guide is the authority on that type's content
+doctrine; this skill only covers the mechanics shared by all types.
 
 Commands accept a type by name or by tag interchangeably (`pm new feat …` ≡
 `pm new feature …`).
@@ -141,10 +145,13 @@ Gemini CLI, Codex) have no such rule; reading first still avoids blind edits.
 ## After `pm new`
 
 The file holds frontmatter only; the body is empty. Read the type's guide if
-you have not yet, read the file, then write the body. **Never leave a document
-empty**: at least one sentence of intent, done condition, or origin. If there
-is nothing to say beyond the title, the item belonged on a checklist in an
-existing document. Type guides may set a higher bar.
+you have not yet, read the file, then write the body. Usually that happens
+right after creation; when you create several documents at once (e.g. the user
+lists several tasks), create them all first, then fill them one by one.
+**No document stays empty at the end of the session**: each needs at least one
+sentence of intent, done condition, or origin. If there is nothing to say
+beyond the title, the item belonged on a checklist in an existing document.
+Type guides may set a higher bar.
 
 ## Typical workflow
 
@@ -171,7 +178,7 @@ command never changes the current document.
 ## Tips for agents
 
 - `pm new` needs no quotes around the title — trailing words are joined.
-  Right after creation, read the file and write its body (see above).
+  Then read the file and write its body (see above).
 - Always pass `--parent` when the work belongs under an existing document or
   group; parentless documents are top-level by design, not by accident.
 - To change a document's type: `pm edit <id> --type <t>` (renames the file's

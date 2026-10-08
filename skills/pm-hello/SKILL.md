@@ -12,12 +12,14 @@ user-invocable: true
 
 # PM Hello — Session Bootstrap
 
-**Always** load the `pm-guide` skill for command reference and concept
-definitions used throughout this workflow.
+**Load the `pm-guide` skill before anything else** unless it is already loaded
+in this session. This is mandatory, whatever the request: it holds the command
+reference, the concept definitions, and the rules about type guides used
+throughout this workflow.
 
-**Always** run `pm info` first: it lists this project's document types with
+**Always** run `pm info` next: it lists this project's document types with
 their descriptions and the path of each type's guide. Read a type's guide
-before creating or working on documents of that type.
+before creating or working on documents of that type, as `pm-guide` requires.
 
 Then choose a mode based on how the skill was invoked.
 
@@ -67,7 +69,17 @@ description (from `pm info`) fits the work, read its guide, and propose the
 creation to the user. Parents are optional: attach the document under a
 related node when one exists, create it top-level otherwise.
 
+When the user explicitly asked for the new document, create it without
+waiting; otherwise wait for their answer to the proposal.
+
+When the user brings open points or asks to discuss, have the discussion
+before writing the body. Share what you researched and your recommendation for
+each point, and let the user decide.
+
 In all creation cases, read the created file with your file read tool and
-write its body following the guide (never leave it empty). Set it as current
+write its body following the guide. When several documents are created at
+once, create them all, then fill them one by one; none stays empty at the end
+of the session. The body records what the user agreed to; anything else is
+written as a proposal or an open question. Set it as current
 with `pm current <id>` only when the user is starting that work now — documents
 prepared for later stay uncurrent.
