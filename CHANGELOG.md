@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.0] - 2026-10-08
+
+### 🚀 Features
+
+- Warn empty bodies in pm tidy
+
+### 💼 Other
+
+- Skill changes for better spec iteration
+
+### ⚙️ Miscellaneous Tasks
+
+- Fix stale build files
+- Describe project in README.md
+
 ## [0.13.1] - 2026-09-03
 
 ### 💼 Other
